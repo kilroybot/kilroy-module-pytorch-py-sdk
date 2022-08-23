@@ -1,4 +1,5 @@
 import weakref
+from contextlib import contextmanager
 from typing import (
     Any,
     Generic,
@@ -11,7 +12,7 @@ from typing import (
 )
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.nn.utils.rnn import (
     PackedSequence,
     pack_padded_sequence,
@@ -88,3 +89,17 @@ def squash_packed(x, fn):
     return PackedSequence(
         fn(x.data), x.batch_sizes, x.sorted_indices, x.unsorted_indices
     )
+
+
+@contextmanager
+def freeze(model: nn.Module) -> nn.Module:
+    original_state = {}
+
+    for name, param in model.named_parameters():
+        original_state[name] = param.requires_grad
+        param.requires_grad = False
+
+    yield model
+
+    for name, param in model.named_parameters():
+        param.requires_grad = original_state[name]

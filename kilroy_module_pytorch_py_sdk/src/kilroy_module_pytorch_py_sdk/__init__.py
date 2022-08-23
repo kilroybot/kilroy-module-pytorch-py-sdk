@@ -30,6 +30,8 @@ from kilroy_module_pytorch_py_sdk.samplers import (
     EpsilonNucleusCategoricalSampler,
 )
 from kilroy_module_pytorch_py_sdk.utils import (
+    truncate_first_element,
+    truncate_last_element,
     pad,
     unpad,
     pack_padded,
@@ -37,4 +39,5 @@ from kilroy_module_pytorch_py_sdk.utils import (
     unpack_to_padded,
     unpack_to_list,
     squash_packed,
+    freeze,
 )
