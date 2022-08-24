@@ -1,15 +1,5 @@
-import weakref
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Generic,
-    Iterable,
-    List,
-    MutableMapping,
-    Optional,
-    Tuple,
-    TypeVar,
-)
+from typing import AsyncIterator, Iterable, List, Optional, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -19,18 +9,6 @@ from torch.nn.utils.rnn import (
     pad_packed_sequence,
     pad_sequence,
 )
-
-T = TypeVar("T")
-
-
-class SelfCleaningKey(Generic[T]):
-    def __init__(self, key: T, store: MutableMapping[T, Any]) -> None:
-        self._key = key
-        weakref.finalize(self, store.__delitem__, key)
-
-    @property
-    def key(self) -> T:
-        return self._key
 
 
 def slice_sequences(sequences: Iterable[Tensor], s: slice) -> List[Tensor]:
@@ -92,7 +70,7 @@ def squash_packed(x, fn):
 
 
 @contextmanager
-def freeze(model: nn.Module) -> nn.Module:
+def freeze(model: nn.Module) -> AsyncIterator[nn.Module]:
     original_state = {}
 
     for name, param in model.named_parameters():
