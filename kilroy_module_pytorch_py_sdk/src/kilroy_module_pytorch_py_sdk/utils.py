@@ -28,8 +28,9 @@ def truncate_last_element(
 
 
 def pad(x: Iterable[Tensor], pad_value: float = 0) -> Tuple[Tensor, List[int]]:
+    x = list(x)
     return (
-        pad_sequence(list(x), batch_first=True, padding_value=pad_value),
+        pad_sequence(x, batch_first=True, padding_value=pad_value),
         [len(s) for s in x],
     )
 
