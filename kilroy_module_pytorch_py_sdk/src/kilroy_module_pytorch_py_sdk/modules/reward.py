@@ -7,7 +7,6 @@ from typing import (
     Coroutine,
     Dict,
     Generator,
-    Iterable,
     List,
     Set,
     Tuple,
@@ -34,7 +33,6 @@ from torch.nn import MSELoss, NLLLoss
 from torch.nn.utils.rnn import PackedSequence
 
 from kilroy_module_pytorch_py_sdk.codec import Codec
-from kilroy_module_pytorch_py_sdk.generator import GenerationResult
 from kilroy_module_pytorch_py_sdk.models import LanguageModel, RewardModel
 from kilroy_module_pytorch_py_sdk.optimizers import Optimizer
 from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
@@ -240,38 +238,16 @@ class RewardModelModule(Module[State], ABC):
                 yield post_id, post
 
     @staticmethod
-    def _fit_supervised_batch(
-        model: LanguageModel, batch: Iterable[Tensor]
+    def _fit_language_model_batch(
+        model: LanguageModel, sequences: PackedSequence
     ) -> float:
+        batch = unpack_to_list(sequences)
         input = pack_list(truncate_last_element(batch))
         target = pack_list(truncate_first_element(batch))
         logprobs = model(input)
         loss = NLLLoss()(logprobs.data, target.data.flatten())
         loss.backward()
         return loss.item()
-
-    async def _fit_supervised(self, data: AsyncIterable[Tensor]) -> None:
-        async with self.state.read_lock() as state:
-            batches = stream.chunks(data, state.batch_size)
-
-        async with batches.stream() as streamer:
-            async for batch in streamer:
-                async with self.state.write_lock() as state:
-                    loss = await background(
-                        self._fit_supervised_batch, state.language_model, batch
-                    )
-                    state.epoch_supervised_losses.append(loss)
-
-    async def fit_posts(self, posts: AsyncIterable[Dict[str, Any]]) -> None:
-        async def decoded():
-            async for post in posts:
-                # noinspection PyShadowingNames
-                async with self.state.read_lock() as state:
-                    yield await state.codec.decode(
-                        state.language_model_tokenizer, post
-                    )
-
-        await self._fit_supervised(decoded())
 
     @staticmethod
     def _fit_reward_model_batch(
@@ -284,13 +260,53 @@ class RewardModelModule(Module[State], ABC):
 
     @staticmethod
     def _fit_with_reward_model_batch(
-        model: RewardModel, batch: GenerationResult
+        model: RewardModel, sequences: PackedSequence, logprobs: Tensor
     ) -> float:
         with freeze(model) as frozen:
-            scores = frozen(batch.sequences)
-        loss = -(batch.logprobs * scores).mean()
+            scores = frozen(sequences)
+        loss = -(logprobs * scores).mean()
         loss.backward()
         return scores.mean().item()
+
+    async def _fit_supervised(
+        self, data: AsyncIterable[Tuple[Tensor, Tensor]]
+    ) -> None:
+        async with self.state.read_lock() as state:
+            batches = stream.chunks(data, state.batch_size)
+
+        async with batches.stream() as streamer:
+            async for batch in streamer:
+                async with self.state.write_lock() as state:
+                    sequences = pack_list(sequence for sequence, _ in batch)
+                    scores = torch.vstack([score for _, score in batch])
+                    loss = await background(
+                        self._fit_language_model_batch,
+                        state.language_model,
+                        sequences,
+                    )
+                    state.epoch_supervised_losses.append(loss)
+                    loss = await background(
+                        self._fit_reward_model_batch,
+                        state.reward_model,
+                        sequences,
+                        scores,
+                    )
+                    state.epoch_reward_model_losses.append(loss)
+
+    async def fit_posts(
+        self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
+    ) -> None:
+        async def decoded():
+            async for post, score in posts:
+                # noinspection PyShadowingNames
+                async with self.state.read_lock() as state:
+                    post = await state.codec.decode(
+                        state.language_model_tokenizer, post
+                    )
+                    score = torch.tensor(score, dtype=torch.float)
+                    yield post, score
+
+        await self._fit_supervised(decoded())
 
     async def _fit_with_reward_model(self) -> None:
         async with self.state.read_lock() as state:
@@ -309,10 +325,13 @@ class RewardModelModule(Module[State], ABC):
                 except StopAsyncIteration:
                     break
                 # TODO: recode
+                sequences = batch.sequences
+                logprobs = batch.logprobs
                 score = await background(
                     self._fit_with_reward_model_batch,
                     state.reward_model,
-                    batch,
+                    sequences,
+                    logprobs,
                 )
                 state.epoch_reward_model_scores.append(score)
 

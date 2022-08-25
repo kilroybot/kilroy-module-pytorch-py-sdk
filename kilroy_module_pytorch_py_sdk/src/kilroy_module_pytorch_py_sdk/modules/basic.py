@@ -167,9 +167,11 @@ class BasicModule(Module[State], ABC):
                     loss = await background(fit, state.model, batch)
                     state.epoch_supervised_losses.append(loss)
 
-    async def fit_posts(self, posts: AsyncIterable[Dict[str, Any]]) -> None:
+    async def fit_posts(
+        self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
+    ) -> None:
         async def decoded():
-            async for post in posts:
+            async for post, _ in posts:
                 # noinspection PyShadowingNames
                 async with self.state.read_lock() as state:
                     yield await state.codec.decode(state.tokenizer, post)
