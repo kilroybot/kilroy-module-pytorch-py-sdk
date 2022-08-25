@@ -219,7 +219,7 @@ class RewardModelModule(Module[State], ABC):
             }
 
     async def generate(
-        self, n: int
+        self, n: int, dry: bool
     ) -> AsyncIterable[Tuple[UUID, Dict[str, Any]]]:
         async with self.state.read_lock() as state:
             generated = state.frontend_generator.generate(
@@ -234,8 +234,9 @@ class RewardModelModule(Module[State], ABC):
                     post = await state.codec.encode(
                         state.language_model_tokenizer, sequence
                     )
-                async with self.state.write_lock() as state:
-                    state.results_cache[post_id] = (sequence, logprob[0])
+                if not dry:
+                    async with self.state.write_lock() as state:
+                        state.results_cache[post_id] = (sequence, logprob[0])
                 yield post_id, post
 
     @staticmethod
