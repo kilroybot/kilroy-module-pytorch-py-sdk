@@ -24,7 +24,6 @@ class Params(SerializableModel):
     samplers_params: Dict[str, Dict[str, Any]] = {}
     contexts: List[str] = [""]
     max_length: int
-    end_tokens: List[str] = []
     batch_size: int
 
 
@@ -34,7 +33,6 @@ class State:
     samplers_params: Dict[str, Dict[str, Any]]
     contexts: List[str]
     max_length: int
-    end_tokens: List[str]
     batch_size: int
 
 
@@ -54,12 +52,6 @@ class MaxLengthParameter(Parameter[State, int]):
         return {"type": "integer", "minimum": 1}
 
 
-class EndTokensParameter(Parameter[State, List[str]]):
-    @classproperty
-    def schema(cls) -> Dict[str, Any]:
-        return {"type": "array", "items": {"type": "string"}, "minItems": 1}
-
-
 class BatchSizeParameter(Parameter[State, int]):
     @classproperty
     def schema(cls) -> Dict[str, Any]:
@@ -73,7 +65,6 @@ class Generator(Configurable[State]):
             SamplerParameter(),
             ContextsParameter(),
             MaxLengthParameter(),
-            EndTokensParameter(),
             BatchSizeParameter(),
         }
 
@@ -91,7 +82,6 @@ class Generator(Configurable[State]):
             samplers_params=params.samplers_params,
             contexts=params.contexts,
             max_length=params.max_length,
-            end_tokens=params.end_tokens,
             batch_size=params.batch_size,
         )
 
@@ -110,11 +100,6 @@ class Generator(Configurable[State]):
             encoded = tokenizer.encode(context)
             yield encoded[:-1]
 
-    @staticmethod
-    def _get_end_tokens(state: State, tokenizer: Tokenizer) -> Iterable[int]:
-        for token in state.end_tokens:
-            yield tokenizer.encode(token)[1]
-
     async def generate(
         self,
         model: LanguageModel,
@@ -122,8 +107,6 @@ class Generator(Configurable[State]):
         n: int,
     ) -> AsyncIterable[GenerationResult]:
         async with self.state.read_lock() as state:
-            end_tokens = set(self._get_end_tokens(state, tokenizer))
-
             while n > 0:
                 batch_size = min(n, state.batch_size)
                 n -= batch_size
@@ -134,5 +117,5 @@ class Generator(Configurable[State]):
                     state.sampler,
                     contexts,
                     state.max_length,
-                    end_tokens,
+                    tokenizer.end_token,
                 )
