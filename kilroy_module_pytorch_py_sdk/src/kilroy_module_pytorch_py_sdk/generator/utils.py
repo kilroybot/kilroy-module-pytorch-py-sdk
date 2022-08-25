@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Container, Iterable, List, Tuple
+from typing import Iterable, List, Tuple
 
 import torch
 from kilroy_module_server_py_sdk import background
@@ -68,16 +68,16 @@ async def _pick(
 
 
 def _get_finished_mask(
-    next_values: Iterable[Tensor], end_indices: Container[int]
+    next_values: Iterable[Tensor], end_value: int
 ) -> List[bool]:
-    return [value.item() in end_indices for value in next_values]
+    return [value.item() == end_value for value in next_values]
 
 
 def _update_state(
     state: GenerationState,
     next_values: Iterable[Tensor],
     next_logprobs: Iterable[Tensor],
-    end_indices: Container[int],
+    end_value: int,
 ) -> GenerationState:
     sequences = [
         torch.cat((current, next.view(1, 1)))
@@ -88,7 +88,7 @@ def _update_state(
         for current, next in zip(state.current_logprobs, next_logprobs)
     ]
 
-    finished_mask = _get_finished_mask(next_values, end_indices)
+    finished_mask = _get_finished_mask(next_values, end_value)
 
     state.finished_sequences.extend(
         [
@@ -133,11 +133,18 @@ def _update_state(
     return state
 
 
-def _complete(state: GenerationState) -> Tuple[List[Tensor], List[Tensor]]:
-    return (
-        state.finished_sequences + state.current_sequences,
-        state.finished_logprobs + state.current_logprobs,
-    )
+def _complete(
+    state: GenerationState, end_value: int
+) -> Tuple[List[Tensor], List[Tensor]]:
+    sequences = state.finished_sequences + state.current_sequences
+    sequences = [
+        torch.cat((sequence[:-1], torch.tensor([[end_value]])))
+        if sequence[-1].item() != end_value
+        else sequence
+        for sequence in sequences
+    ]
+    logprobs = state.finished_logprobs + state.current_logprobs
+    return sequences, logprobs
 
 
 def _prepare_output(
@@ -158,12 +165,12 @@ async def generate(
     sampler: Sampler,
     contexts: Iterable[Iterable[int]],
     max_length: int,
-    end_indices: Container[int],
+    end_value: int,
 ) -> GenerationResult:
     state = _build_initial_state(contexts)
     while not _should_stop(state, max_length):
         logprobs = await background(_predict, model, state.current_sequences)
         next_values, next_logprobs = await _pick(sampler, logprobs)
-        state = _update_state(state, next_values, next_logprobs, end_indices)
-    sequences, logprobs = _complete(state)
+        state = _update_state(state, next_values, next_logprobs, end_value)
+    sequences, logprobs = _complete(state, end_value)
     return _prepare_output(sequences, logprobs)
