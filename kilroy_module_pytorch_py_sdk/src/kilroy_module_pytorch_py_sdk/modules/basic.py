@@ -130,7 +130,7 @@ class BasicModule(Module[State], ABC):
             }
 
     async def generate(
-        self, n: int
+        self, n: int, dry: bool
     ) -> AsyncIterable[Tuple[UUID, Dict[str, Any]]]:
         async with self.state.read_lock() as state:
             generated = state.generator.generate(
@@ -143,8 +143,9 @@ class BasicModule(Module[State], ABC):
                 post_id = uuid4()
                 async with self.state.read_lock() as state:
                     post = await state.codec.encode(state.tokenizer, sequence)
-                async with self.state.write_lock() as state:
-                    state.results_cache[post_id] = (sequence, logprob[0])
+                if not dry:
+                    async with self.state.write_lock() as state:
+                        state.results_cache[post_id] = (sequence, logprob[0])
                 yield post_id, post
 
     async def _fit_supervised(self, data: AsyncIterable[Tensor]) -> None:
