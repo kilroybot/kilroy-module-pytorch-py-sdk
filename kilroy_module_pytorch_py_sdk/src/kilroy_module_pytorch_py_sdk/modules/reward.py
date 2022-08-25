@@ -268,6 +268,17 @@ class RewardModelModule(Module[State], ABC):
         loss.backward()
         return scores.mean().item()
 
+    @staticmethod
+    def _recode(
+        sequences: PackedSequence, source: Tokenizer, target: Tokenizer
+    ) -> PackedSequence:
+        sequences = unpack_to_list(sequences)
+        sequences = [sequence.flatten().tolist() for sequence in sequences]
+        decoded = [source.decode(sequence) for sequence in sequences]
+        encoded = [target.encode(sequence) for sequence in decoded]
+        encoded = [torch.tensor(sequence).view(-1, 1) for sequence in encoded]
+        return pack_list(encoded)
+
     async def _fit_supervised(
         self, data: AsyncIterable[Tuple[Tensor, Tensor]]
     ) -> None:
@@ -324,8 +335,11 @@ class RewardModelModule(Module[State], ABC):
                     batch = await anext(generated)
                 except StopAsyncIteration:
                     break
-                # TODO: recode
-                sequences = batch.sequences
+                sequences = self._recode(
+                    batch.sequences,
+                    state.language_model_tokenizer,
+                    state.reward_model_tokenizer,
+                )
                 logprobs = batch.logprobs
                 score = await background(
                     self._fit_with_reward_model_batch,
