@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List
 
+import torch
 from kilroy_module_server_py_sdk import (
     Configurable,
     SerializableModel,
@@ -66,8 +68,21 @@ class AdamOptimizer(Optimizer, Configurable[State]):
             return {"type": "number", "minimum": 0}
 
     async def build_default_state(self) -> State:
+        model_params = self._kwargs.pop("parameters")
         user_params = Params(**self._kwargs)
-        return State(optimizer=Adam(self._params, **user_params.dict()))
+        return State(optimizer=Adam(model_params, **user_params.dict()))
+
+    @classmethod
+    async def save_state(cls, state: State, directory: Path) -> None:
+        with open(directory / "optimizer.pt", "wb") as f:
+            await background(torch.save, state.optimizer.state_dict(), f)
+
+    async def load_saved_state(self, directory: Path) -> State:
+        with open(directory / "optimizer.pt", "rb") as f:
+            state_dict = await background(torch.load, f)
+        optimizer = Adam(self._kwargs.pop("parameters"))
+        optimizer.load_state_dict(state_dict)
+        return State(optimizer=optimizer)
 
     async def step(self) -> None:
         async with self.state.write_lock() as state:

@@ -1,11 +1,14 @@
+import json
 import random
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, AsyncIterable, Dict, Iterable, List, Set
 
 from kilroy_module_server_py_sdk import (
     CategorizableBasedParameter,
     Configurable,
     Parameter,
+    Savable,
     SerializableModel,
     classproperty,
 )
@@ -70,19 +73,50 @@ class Generator(Configurable[State]):
 
     async def build_default_state(self) -> State:
         params = Params(**self._kwargs)
-        sampler_cls = Sampler.for_category(params.sampler_type)
-        sampler_params = params.samplers_params.get(params.sampler_type, {})
-        if issubclass(sampler_cls, Configurable):
-            sampler = await sampler_cls.build(**sampler_params)
-            await sampler.init()
-        else:
-            sampler = sampler_cls(**sampler_params)
         return State(
-            sampler=sampler,
+            sampler=await self.build_generic(
+                Sampler,
+                category=params.sampler_type,
+                **params.samplers_params.get(params.sampler_type, {}),
+            ),
             samplers_params=params.samplers_params,
             contexts=params.contexts,
             max_length=params.max_length,
             batch_size=params.batch_size,
+        )
+
+    async def save_state(self, state: State, directory: Path) -> None:
+        state_dict = {
+            "sampler_type": state.sampler.category,
+            "samplers_params": state.samplers_params,
+            "contexts": state.contexts,
+            "max_length": state.max_length,
+            "batch_size": state.batch_size,
+        }
+        if isinstance(state.sampler, Savable):
+            await state.sampler.save(directory / "sampler")
+        with open(directory / "state.json", "w") as f:
+            json.dump(state_dict, f)
+
+    async def load_saved_state(self, directory: Path) -> State:
+        with open(directory / "state.json", "r") as f:
+            state_dict = json.load(f)
+        sampler_type = state_dict["sampler_type"]
+        sampler_kwargs = {
+            **self._kwargs.get("samplers_params", {}).get(sampler_type, {}),
+            **state_dict["samplers_params"].get(sampler_type, {}),
+        }
+        return State(
+            sampler=await self.load_generic(
+                directory / "sampler",
+                Sampler,
+                category=state_dict["sampler_type"],
+                **sampler_kwargs,
+            ),
+            samplers_params=state_dict["samplers_params"],
+            contexts=state_dict["contexts"],
+            max_length=state_dict["max_length"],
+            batch_size=state_dict["batch_size"],
         )
 
     async def cleanup(self) -> None:

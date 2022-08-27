@@ -1,16 +1,7 @@
 from abc import ABC
 from asyncio import Queue, Task
 from dataclasses import dataclass
-from typing import (
-    Any,
-    AsyncIterable,
-    Coroutine,
-    Dict,
-    Generator,
-    List,
-    Set,
-    Tuple,
-)
+from typing import Any, AsyncIterable, Coroutine, Dict, List, Set, Tuple
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -32,6 +23,7 @@ from torch import Tensor
 from torch.nn import MSELoss, NLLLoss
 from torch.nn.utils.rnn import PackedSequence
 
+from kilroy_module_pytorch_py_sdk import Generator
 from kilroy_module_pytorch_py_sdk.codec import Codec
 from kilroy_module_pytorch_py_sdk.models import LanguageModel, RewardModel
 from kilroy_module_pytorch_py_sdk.optimizers import Optimizer

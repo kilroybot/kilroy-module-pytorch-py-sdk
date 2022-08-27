@@ -54,12 +54,6 @@ class OptimizerParameter(
 
 
 class Optimizer(Categorizable, ABC):
-    def __init__(
-        self, params: Union[Iterable[Tensor], Iterable[Dict]], *args, **kwargs
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self._params = list(params)
-
     @classproperty
     def category(cls) -> str:
         name: str = cls.__name__
