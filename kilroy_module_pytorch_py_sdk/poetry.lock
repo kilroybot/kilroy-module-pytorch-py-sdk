@@ -158,7 +158,7 @@ test = ["pytest (>=7.0,<8.0)"]
 
 [[package]]
 name = "kilroy-module-server-py-sdk"
-version = "0.8.0"
+version = "0.8.1"
 description = "SDK for kilroy module servers in Python 🧰"
 category = "main"
 optional = false
@@ -168,7 +168,7 @@ python-versions = ">=3.9,<4.0"
 aiostream = ">=0.4,<0.5"
 asyncstdlib = ">=3.9,<4.0"
 kilroy-module-py-shared = ">=0.5,<0.6"
-kilroy-server-py-utils = ">=0.1,<0.2"
+kilroy-server-py-utils = ">=0.2,<0.3"
 
 [package.extras]
 dev = ["pytest (>=7,<8)"]
@@ -176,7 +176,7 @@ test = ["pytest (>=7,<8)"]
 
 [[package]]
 name = "kilroy-server-py-utils"
-version = "0.1.4"
+version = "0.2.0"
 description = "utilities for kilroy servers 🔧"
 category = "main"
 optional = false
@@ -256,7 +256,7 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pyhumps"
-version = "3.7.2"
+version = "3.7.3"
 description = "🐫  Convert strings (and dictionary keys) between snake case, camel case and pascal case in Python. Inspired by Humps for Node"
 category = "main"
 optional = false
@@ -412,12 +412,12 @@ kilroy-module-py-shared = [
     {file = "kilroy_module_py_shared-0.5.0-py3-none-any.whl", hash = "sha256:84fb54a2acb654c618e0d25cde0edb4e0706abc19e4925606445840dc39b0822"},
 ]
 kilroy-module-server-py-sdk = [
-    {file = "kilroy-module-server-py-sdk-0.8.0.tar.gz", hash = "sha256:149f95e5e3f60900d4fe277ef583002e65a2d00366d1907b60ffb41ea696f1a4"},
-    {file = "kilroy_module_server_py_sdk-0.8.0-py3-none-any.whl", hash = "sha256:b1523c097bb89677e9f28b9f9f017331a55af5063042d00a1932601bd361bb4e"},
+    {file = "kilroy-module-server-py-sdk-0.8.1.tar.gz", hash = "sha256:38b4c37c139862ad538d15472bafefd35e94aeae27a50b1d79c1e81d5b88d5ed"},
+    {file = "kilroy_module_server_py_sdk-0.8.1-py3-none-any.whl", hash = "sha256:5c84c4bbe476a00353b14e3cafb21c2af121fae494be3b2d7d5657b53cca6509"},
 ]
 kilroy-server-py-utils = [
-    {file = "kilroy-server-py-utils-0.1.4.tar.gz", hash = "sha256:7cc25861b71cfb1c4ff5fd9cdd17abb9e0b5022335429350655c130bd70803b3"},
-    {file = "kilroy_server_py_utils-0.1.4-py3-none-any.whl", hash = "sha256:fd7bf44177b269aa9a9b54209767ee523804f568c5fc11488bfa0dda300ae60e"},
+    {file = "kilroy-server-py-utils-0.2.0.tar.gz", hash = "sha256:62abeb048b84d5988e9d75c894c9a0a2a02c16e4de8cdfbbe447b0b6dc2eccde"},
+    {file = "kilroy_server_py_utils-0.2.0-py3-none-any.whl", hash = "sha256:4989319bd13f94bfb0a16e9b5620bf71b84a44f19286a61b7b5ec126ede0d298"},
 ]
 multidict = [
     {file = "multidict-6.0.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0b9e95a740109c6047602f4db4da9949e6c5945cefbad34a1299775ddc9a62e2"},
@@ -560,8 +560,8 @@ pydantic = [
     {file = "pydantic-1.9.2.tar.gz", hash = "sha256:8cb0bc509bfb71305d7a59d00163d5f9fc4530f0881ea32c74ff4f74c85f3d3d"},
 ]
 pyhumps = [
-    {file = "pyhumps-3.7.2-py3-none-any.whl", hash = "sha256:f554bc742138c01ef85176534a411b105c3e7b20133b3c68bd4e613dcb425241"},
-    {file = "pyhumps-3.7.2.tar.gz", hash = "sha256:cadfffd84e8cf93cf5566ed351bbd0d5356e04ffc03de7d2aa262660c144b775"},
+    {file = "pyhumps-3.7.3-py3-none-any.whl", hash = "sha256:8cf9503f71be250a1ec2c0af997309e6360ad4daa343acd7faafde54cce36469"},
+    {file = "pyhumps-3.7.3.tar.gz", hash = "sha256:6eec3741cf917009adb16f6b6b883429edb1c6286531bd9f3977ba41938b0a09"},
 ]
 pyparsing = [
     {file = "pyparsing-3.0.9-py3-none-any.whl", hash = "sha256:5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc"},
