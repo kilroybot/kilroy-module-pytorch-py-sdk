@@ -1,17 +1,9 @@
 import json
 import random
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any, AsyncIterable, Dict, Iterable, List, Set
-
-from kilroy_module_server_py_sdk import (
-    CategorizableBasedParameter,
-    Configurable,
-    Parameter,
-    Savable,
-    SerializableModel,
-    classproperty,
-)
 
 from kilroy_module_pytorch_py_sdk.generator.utils import (
     GenerationResult,
@@ -20,6 +12,14 @@ from kilroy_module_pytorch_py_sdk.generator.utils import (
 from kilroy_module_pytorch_py_sdk.models import LanguageModel
 from kilroy_module_pytorch_py_sdk.samplers import Sampler
 from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
+from kilroy_module_server_py_sdk import (
+    CategorizableBasedParameter,
+    Configurable,
+    Parameter,
+    Savable,
+    SerializableModel,
+    classproperty,
+)
 
 
 class Params(SerializableModel):
@@ -71,21 +71,24 @@ class Generator(Configurable[State]):
             BatchSizeParameter(),
         }
 
-    async def build_default_state(self) -> State:
+    async def _build_sampler(self, params: Params) -> Sampler:
+        return await self._build_generic(
+            Sampler,
+            category=params.sampler_type,
+            **params.samplers_params.get(params.sampler_type, {}),
+        )
+
+    async def _build_default_state(self) -> State:
         params = Params(**self._kwargs)
         return State(
-            sampler=await self.build_generic(
-                Sampler,
-                category=params.sampler_type,
-                **params.samplers_params.get(params.sampler_type, {}),
-            ),
+            sampler=await self._build_sampler(params),
             samplers_params=params.samplers_params,
             contexts=params.contexts,
             max_length=params.max_length,
             batch_size=params.batch_size,
         )
 
-    async def save_state(self, state: State, directory: Path) -> None:
+    async def _save_state(self, state: State, directory: Path) -> None:
         state_dict = {
             "sampler_type": state.sampler.category,
             "samplers_params": state.samplers_params,
@@ -98,20 +101,16 @@ class Generator(Configurable[State]):
         with open(directory / "state.json", "w") as f:
             json.dump(state_dict, f)
 
-    async def load_saved_state(self, directory: Path) -> State:
+    async def _load_saved_state(self, directory: Path) -> State:
         with open(directory / "state.json", "r") as f:
             state_dict = json.load(f)
-        sampler_type = state_dict["sampler_type"]
-        sampler_kwargs = {
-            **self._kwargs.get("samplers_params", {}).get(sampler_type, {}),
-            **state_dict["samplers_params"].get(sampler_type, {}),
-        }
+        params = Params(**self._kwargs)
         return State(
-            sampler=await self.load_generic(
+            sampler=await self._load_generic(
                 directory / "sampler",
                 Sampler,
                 category=state_dict["sampler_type"],
-                **sampler_kwargs,
+                default=partial(self._build_sampler, params),
             ),
             samplers_params=state_dict["samplers_params"],
             contexts=state_dict["contexts"],

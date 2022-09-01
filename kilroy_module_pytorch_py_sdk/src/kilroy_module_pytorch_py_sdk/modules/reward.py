@@ -1,7 +1,17 @@
 from abc import ABC
 from asyncio import Queue, Task
 from dataclasses import dataclass
-from typing import Any, AsyncIterable, Coroutine, Dict, List, Set, Tuple
+from typing import (
+    Any,
+    AsyncIterable,
+    Coroutine,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -23,8 +33,8 @@ from torch import Tensor
 from torch.nn import MSELoss, NLLLoss
 from torch.nn.utils.rnn import PackedSequence
 
-from kilroy_module_pytorch_py_sdk import Generator
 from kilroy_module_pytorch_py_sdk.codec import Codec
+from kilroy_module_pytorch_py_sdk.generator import Generator
 from kilroy_module_pytorch_py_sdk.models import LanguageModel, RewardModel
 from kilroy_module_pytorch_py_sdk.optimizers import Optimizer
 from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
@@ -110,15 +120,41 @@ class RewardModelScoreMetric(Metric[Dict]):
 
 
 @dataclass
+class LanguageModelState:
+    model: LanguageModel
+    tokenizer: Tokenizer
+    optimizer: Optimizer
+    optimizers_params: Dict[str, Dict[str, Any]]
+
+
+@dataclass
+class RewardModelState:
+    model: RewardModel
+    tokenizer: Tokenizer
+    optimizer: Optimizer
+    optimizers_params: Dict[str, Dict[str, Any]]
+
+
+@dataclass
+class MetricsState:
+    supervised_loss_metric: SupervisedLossMetric
+    reinforced_score_metric: ReinforcedScoreMetric
+    reward_model_loss_metric: RewardModelLossMetric
+    reward_model_score_metric: RewardModelScoreMetric
+
+
+@dataclass
+class ReportsState:
+    epoch_supervised_losses: List[float]
+    epoch_reinforced_scores: List[float]
+    epoch_reward_model_losses: List[float]
+    epoch_reward_model_scores: List[float]
+
+
+@dataclass
 class State:
-    language_model: LanguageModel
-    reward_model: RewardModel
-    language_model_tokenizer: Tokenizer
-    reward_model_tokenizer: Tokenizer
-    language_model_optimizer: Optimizer
-    language_model_optimizers_params: Dict[str, Dict[str, Any]]
-    reward_model_optimizer: Optimizer
-    reward_model_optimizers_params: Dict[str, Dict[str, Any]]
+    language_model: LanguageModelState
+    reward_model: RewardModelState
     frontend_generator: Generator
     backend_generator: Generator
     codec: Codec
@@ -126,14 +162,8 @@ class State:
     batch_size: int
     sample_size: int
     epoch: int
-    supervised_loss_metric: SupervisedLossMetric
-    reinforced_score_metric: ReinforcedScoreMetric
-    reward_model_loss_metric: RewardModelLossMetric
-    reward_model_score_metric: RewardModelScoreMetric
-    epoch_supervised_losses: List[float]
-    epoch_reinforced_scores: List[float]
-    epoch_reward_model_losses: List[float]
-    epoch_reward_model_scores: List[float]
+    metrics: MetricsState
+    reports: ReportsState
     coroutine_queue: Queue[Coroutine]
     worker_task: Task
 
@@ -143,8 +173,8 @@ class LanguageModelOptimizerParameter(
 ):
     async def _get_params(self, state: State, category: str) -> Dict[str, Any]:
         return {
-            "params": state.language_model.parameters(),
-            **state.language_model_optimizers_params.get(category, {}),
+            "parameters": state.language_model.model.parameters(),
+            **state.language_model.optimizers_params.get(category, {}),
         }
 
 
@@ -153,8 +183,8 @@ class RewardModelOptimizerParameter(
 ):
     async def _get_params(self, state: State, category: str) -> Dict[str, Any]:
         return {
-            "params": state.reward_model.parameters(),
-            **state.reward_model_optimizers_params.get(category, {}),
+            "parameters": state.reward_model.model.parameters(),
+            **state.reward_model.optimizers_params.get(category, {}),
         }
 
 
@@ -202,10 +232,10 @@ class RewardModelModule(Module[State], ABC):
     async def get_metrics(self) -> Set[Metric]:
         async with self.state.read_lock() as state:
             return {
-                state.supervised_loss_metric,
-                state.reinforced_score_metric,
-                state.reward_model_loss_metric,
-                state.reward_model_score_metric,
+                state.metrics.supervised_loss_metric,
+                state.metrics.reinforced_score_metric,
+                state.metrics.reward_model_loss_metric,
+                state.metrics.reward_model_score_metric,
             }
 
     async def generate(
@@ -213,7 +243,7 @@ class RewardModelModule(Module[State], ABC):
     ) -> AsyncIterable[Tuple[UUID, Dict[str, Any]]]:
         async with self.state.read_lock() as state:
             generated = state.frontend_generator.generate(
-                state.language_model, state.language_model_tokenizer, n
+                state.language_model.model, state.language_model.tokenizer, n
             )
 
         async for result in generated:
@@ -222,7 +252,7 @@ class RewardModelModule(Module[State], ABC):
                 post_id = uuid4()
                 async with self.state.read_lock() as state:
                     post = await state.codec.encode(
-                        state.language_model_tokenizer, sequence
+                        state.language_model.tokenizer, sequence
                     )
                 if not dry:
                     async with self.state.write_lock() as state:
@@ -284,17 +314,17 @@ class RewardModelModule(Module[State], ABC):
                     scores = torch.vstack([score for _, score in batch])
                     loss = await background(
                         self._fit_language_model_batch,
-                        state.language_model,
+                        state.language_model.model,
                         sequences,
                     )
-                    state.epoch_supervised_losses.append(loss)
+                    state.reports.epoch_supervised_losses.append(loss)
                     loss = await background(
                         self._fit_reward_model_batch,
-                        state.reward_model,
+                        state.reward_model.model,
                         sequences,
                         scores,
                     )
-                    state.epoch_reward_model_losses.append(loss)
+                    state.reports.epoch_reward_model_losses.append(loss)
 
     async def fit_posts(
         self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
@@ -304,7 +334,7 @@ class RewardModelModule(Module[State], ABC):
                 # noinspection PyShadowingNames
                 async with self.state.read_lock() as state:
                     post = await state.codec.decode(
-                        state.language_model_tokenizer, post
+                        state.language_model.tokenizer, post
                     )
                     score = torch.tensor(score, dtype=torch.float)
                     yield post, score
@@ -314,8 +344,8 @@ class RewardModelModule(Module[State], ABC):
     async def _fit_with_reward_model(self) -> None:
         async with self.state.read_lock() as state:
             generated = state.backend_generator.generate(
-                state.language_model,
-                state.language_model_tokenizer,
+                state.language_model.model,
+                state.language_model.tokenizer,
                 state.sample_size,
             )
 
@@ -329,17 +359,17 @@ class RewardModelModule(Module[State], ABC):
                     break
                 sequences = self._recode(
                     batch.sequences,
-                    state.language_model_tokenizer,
-                    state.reward_model_tokenizer,
+                    state.language_model.tokenizer,
+                    state.reward_model.tokenizer,
                 )
                 logprobs = batch.logprobs
                 score = await background(
                     self._fit_with_reward_model_batch,
-                    state.reward_model,
+                    state.reward_model.model,
                     sequences,
                     logprobs,
                 )
-                state.epoch_reward_model_scores.append(score)
+                state.reports.epoch_reward_model_scores.append(score)
 
     async def _fit_reinforced(
         self,
@@ -355,12 +385,14 @@ class RewardModelModule(Module[State], ABC):
                 async with self.state.write_lock() as state:
                     loss = await background(
                         self._fit_reward_model_batch,
-                        state.reward_model,
+                        state.reward_model.model,
                         sequences,
                         scores,
                     )
-                    state.epoch_reward_model_losses.append(loss)
-                    state.epoch_reinforced_scores.append(scores.mean().item())
+                    state.reports.epoch_reward_model_losses.append(loss)
+                    state.reports.epoch_reinforced_scores.append(
+                        scores.mean().item()
+                    )
 
         async with self.state.write_lock() as state:
             await state.coroutine_queue.put(self._fit_with_reward_model())
@@ -375,40 +407,48 @@ class RewardModelModule(Module[State], ABC):
 
         await self._fit_reinforced(get_results())
 
+    @staticmethod
+    async def _report_mean_from_epoch(
+        metric: Metric, epoch: int, label: str, values: Iterable[float]
+    ) -> None:
+        values = list(values)
+        if values:
+            await metric.report({"epoch": epoch, label: np.mean(values)})
+
+    @staticmethod
+    async def _reset_reports(state: State) -> None:
+        state.reports.epoch_supervised_losses = []
+        state.reports.epoch_reinforced_scores = []
+        state.reports.epoch_reward_model_losses = []
+        state.reports.epoch_reward_model_scores = []
+
     async def step(self) -> None:
         async with self.state.write_lock() as state:
-            await state.language_model_optimizer.step()
-            await state.reward_model_optimizer.step()
-            if state.epoch_supervised_losses:
-                await state.supervised_loss_metric.report(
-                    {
-                        "epoch": state.epoch,
-                        "loss": np.mean(state.epoch_supervised_losses),
-                    }
-                )
-            if state.epoch_reinforced_scores:
-                await state.reinforced_score_metric.report(
-                    {
-                        "epoch": state.epoch,
-                        "score": np.mean(state.epoch_reinforced_scores),
-                    }
-                )
-            if state.epoch_reward_model_losses:
-                await state.reward_model_loss_metric.report(
-                    {
-                        "epoch": state.epoch,
-                        "loss": np.mean(state.epoch_reward_model_losses),
-                    }
-                )
-            if state.epoch_reward_model_scores:
-                await state.reward_model_score_metric.report(
-                    {
-                        "epoch": state.epoch,
-                        "score": np.mean(state.epoch_reward_model_scores),
-                    }
-                )
-            state.epoch_supervised_losses = []
-            state.epoch_reinforced_scores = []
-            state.epoch_reward_model_losses = []
-            state.epoch_reward_model_scores = []
+            await state.language_model.optimizer.step()
+            await state.reward_model.optimizer.step()
+            await self._report_mean_from_epoch(
+                state.metrics.supervised_loss_metric,
+                state.epoch,
+                "loss",
+                state.reports.epoch_supervised_losses,
+            )
+            await self._report_mean_from_epoch(
+                state.metrics.reinforced_score_metric,
+                state.epoch,
+                "score",
+                state.reports.epoch_reinforced_scores,
+            )
+            await self._report_mean_from_epoch(
+                state.metrics.reward_model_loss_metric,
+                state.epoch,
+                "loss",
+                state.reports.epoch_reward_model_losses,
+            )
+            await self._report_mean_from_epoch(
+                state.metrics.reward_model_score_metric,
+                state.epoch,
+                "score",
+                state.reports.epoch_reward_model_scores,
+            )
+            await self._reset_reports(state)
             state.epoch += 1

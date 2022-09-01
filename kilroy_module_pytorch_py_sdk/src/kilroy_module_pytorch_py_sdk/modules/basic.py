@@ -1,6 +1,15 @@
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, AsyncIterable, Dict, List, Set, Tuple
+from typing import (
+    Any,
+    AsyncIterable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -70,6 +79,18 @@ class ReinforcedScoreMetric(Metric[Dict]):
 
 
 @dataclass
+class MetricsState:
+    supervised_loss_metric: SupervisedLossMetric
+    reinforced_score_metric: ReinforcedScoreMetric
+
+
+@dataclass
+class ReportsState:
+    epoch_supervised_losses: List[float]
+    epoch_reinforced_scores: List[float]
+
+
+@dataclass
 class State:
     model: LanguageModel
     tokenizer: Tokenizer
@@ -80,16 +101,14 @@ class State:
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
     batch_size: int
     epoch: int
-    supervised_loss_metric: SupervisedLossMetric
-    reinforced_score_metric: ReinforcedScoreMetric
-    epoch_supervised_losses: List[float]
-    epoch_reinforced_scores: List[float]
+    metrics: MetricsState
+    reports: ReportsState
 
 
 class OptimizerParameter(CategorizableBasedParameter[State, Optimizer]):
     async def _get_params(self, state: State, category: str) -> Dict[str, Any]:
         return {
-            "params": state.model.parameters(),
+            "parameters": state.model.parameters(),
             **state.optimizers_params.get(category, {}),
         }
 
@@ -125,8 +144,8 @@ class BasicModule(Module[State], ABC):
     async def get_metrics(self) -> Set[Metric]:
         async with self.state.read_lock() as state:
             return {
-                state.supervised_loss_metric,
-                state.reinforced_score_metric,
+                state.metrics.supervised_loss_metric,
+                state.metrics.reinforced_score_metric,
             }
 
     async def generate(
@@ -165,7 +184,7 @@ class BasicModule(Module[State], ABC):
             async for batch in streamer:
                 async with self.state.write_lock() as state:
                     loss = await background(fit, state.model, batch)
-                    state.epoch_supervised_losses.append(loss)
+                    state.reports.epoch_supervised_losses.append(loss)
 
     async def fit_posts(
         self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
@@ -193,7 +212,7 @@ class BasicModule(Module[State], ABC):
 
         async with self.state.write_lock() as state:
             score = await background(fit)
-            state.epoch_reinforced_scores.append(score)
+            state.reports.epoch_reinforced_scores.append(score)
 
     async def fit_scores(self, scores: List[Tuple[UUID, float]]) -> None:
         async def get_results():
@@ -205,23 +224,33 @@ class BasicModule(Module[State], ABC):
 
         await self._fit_reinforced(get_results())
 
+    @staticmethod
+    async def _report_mean_from_epoch(
+        metric: Metric, epoch: int, label: str, values: Iterable[float]
+    ) -> None:
+        values = list(values)
+        if values:
+            await metric.report({"epoch": epoch, label: np.mean(values)})
+
+    @staticmethod
+    async def _reset_reports(state: State) -> None:
+        state.reports.epoch_supervised_losses = []
+        state.reports.epoch_reinforced_scores = []
+
     async def step(self) -> None:
         async with self.state.write_lock() as state:
             await state.optimizer.step()
-            if state.epoch_supervised_losses:
-                await state.supervised_loss_metric.report(
-                    {
-                        "epoch": state.epoch,
-                        "loss": np.mean(state.epoch_supervised_losses),
-                    }
-                )
-            if state.epoch_reinforced_scores:
-                await state.reinforced_score_metric.report(
-                    {
-                        "epoch": state.epoch,
-                        "score": np.mean(state.epoch_reinforced_scores),
-                    }
-                )
-            state.epoch_supervised_losses = []
-            state.epoch_reinforced_scores = []
+            await self._report_mean_from_epoch(
+                state.metrics.supervised_loss_metric,
+                state.epoch,
+                "loss",
+                state.reports.epoch_supervised_losses,
+            )
+            await self._report_mean_from_epoch(
+                state.metrics.reinforced_score_metric,
+                state.epoch,
+                "score",
+                state.reports.epoch_reinforced_scores,
+            )
+            await self._reset_reports(state)
             state.epoch += 1
