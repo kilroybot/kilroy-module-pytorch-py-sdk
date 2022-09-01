@@ -19,6 +19,7 @@ import torch
 from aiostream import stream
 from aiostream.aiter_utils import aiter, anext
 from kilroy_module_server_py_sdk import (
+    CategorizableBasedOptionalParameter,
     CategorizableBasedParameter,
     JSONSchema,
     Metric,
@@ -37,6 +38,7 @@ from kilroy_module_pytorch_py_sdk.codec import Codec
 from kilroy_module_pytorch_py_sdk.generator import Generator
 from kilroy_module_pytorch_py_sdk.models import LanguageModel, RewardModel
 from kilroy_module_pytorch_py_sdk.optimizers import Optimizer
+from kilroy_module_pytorch_py_sdk.schedulers.base import Scheduler
 from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
 from kilroy_module_pytorch_py_sdk.utils import (
     freeze,
@@ -125,6 +127,8 @@ class LanguageModelState:
     tokenizer: Tokenizer
     optimizer: Optimizer
     optimizers_params: Dict[str, Dict[str, Any]]
+    scheduler: Optional[Scheduler]
+    schedulers_params: Dict[str, Dict[str, Any]]
 
 
 @dataclass
@@ -133,6 +137,8 @@ class RewardModelState:
     tokenizer: Tokenizer
     optimizer: Optimizer
     optimizers_params: Dict[str, Dict[str, Any]]
+    scheduler: Optional[Scheduler]
+    schedulers_params: Dict[str, Dict[str, Any]]
 
 
 @dataclass
@@ -177,6 +183,22 @@ class LanguageModelOptimizerParameter(
             **state.language_model.optimizers_params.get(category, {}),
         }
 
+    async def _set_categorizable(self, state: State, value: Optimizer) -> None:
+        await super()._set_categorizable(state, value)
+        if state.language_model.scheduler is not None:
+            optimizer = await value.get()
+            await state.language_model.scheduler.change_optimizer(optimizer)
+
+
+class LanguageModelSchedulerParameter(
+    CategorizableBasedOptionalParameter[State, Scheduler]
+):
+    async def _get_params(self, state: State, category: str) -> Dict[str, Any]:
+        return {
+            "optimizer": await state.language_model.optimizer.get(),
+            **state.language_model.schedulers_params.get(category, {}),
+        }
+
 
 class RewardModelOptimizerParameter(
     CategorizableBasedParameter[State, Optimizer]
@@ -185,6 +207,22 @@ class RewardModelOptimizerParameter(
         return {
             "parameters": state.reward_model.model.parameters(),
             **state.reward_model.optimizers_params.get(category, {}),
+        }
+
+    async def _set_categorizable(self, state: State, value: Optimizer) -> None:
+        await super()._set_categorizable(state, value)
+        if state.reward_model.scheduler is not None:
+            optimizer = await value.get()
+            await state.reward_model.scheduler.change_optimizer(optimizer)
+
+
+class RewardModelSchedulerParameter(
+    CategorizableBasedOptionalParameter[State, Scheduler]
+):
+    async def _get_params(self, state: State, category: str) -> Dict[str, Any]:
+        return {
+            "optimizer": await state.reward_model.optimizer.get(),
+            **state.reward_model.schedulers_params.get(category, {}),
         }
 
 
@@ -221,7 +259,9 @@ class RewardModelModule(Module[State], ABC):
     def parameters(cls) -> Set[Parameter]:
         return {
             LanguageModelOptimizerParameter(),
+            LanguageModelSchedulerParameter(),
             RewardModelOptimizerParameter(),
+            RewardModelSchedulerParameter(),
             FrontendGeneratorParameter(),
             BackendGeneratorParameter(),
             CodecParameter(),
@@ -425,7 +465,11 @@ class RewardModelModule(Module[State], ABC):
     async def step(self) -> None:
         async with self.state.write_lock() as state:
             await state.language_model.optimizer.step()
+            if state.language_model.scheduler is not None:
+                await state.language_model.scheduler.step()
             await state.reward_model.optimizer.step()
+            if state.reward_model.scheduler is not None:
+                await state.reward_model.scheduler.step()
             await self._report_mean_from_epoch(
                 state.metrics.supervised_loss_metric,
                 state.epoch,
