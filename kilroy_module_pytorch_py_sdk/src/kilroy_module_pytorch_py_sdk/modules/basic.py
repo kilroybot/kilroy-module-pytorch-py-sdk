@@ -16,6 +16,7 @@ import numpy as np
 import torch
 from aiostream import stream
 from kilroy_module_server_py_sdk import (
+    CategorizableBasedOptionalParameter,
     CategorizableBasedParameter,
     JSONSchema,
     Metric,
@@ -33,6 +34,7 @@ from kilroy_module_pytorch_py_sdk.codec import Codec
 from kilroy_module_pytorch_py_sdk.generator import Generator
 from kilroy_module_pytorch_py_sdk.models import LanguageModel
 from kilroy_module_pytorch_py_sdk.optimizers import Optimizer
+from kilroy_module_pytorch_py_sdk.schedulers.base import Scheduler
 from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
 from kilroy_module_pytorch_py_sdk.utils import (
     pack_list,
@@ -96,6 +98,8 @@ class State:
     tokenizer: Tokenizer
     optimizer: Optimizer
     optimizers_params: Dict[str, Dict[str, Any]]
+    scheduler: Optional[Scheduler]
+    schedulers_params: Dict[str, Dict[str, Any]]
     generator: Generator
     codec: Codec
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
@@ -110,6 +114,22 @@ class OptimizerParameter(CategorizableBasedParameter[State, Optimizer]):
         return {
             "parameters": state.model.parameters(),
             **state.optimizers_params.get(category, {}),
+        }
+
+    async def _set_categorizable(self, state: State, value: Optimizer) -> None:
+        await super()._set_categorizable(state, value)
+        if state.scheduler is not None:
+            optimizer = await value.get()
+            await state.scheduler.change_optimizer(optimizer)
+
+
+class SchedulerParameter(
+    CategorizableBasedOptionalParameter[State, Scheduler]
+):
+    async def _get_params(self, state: State, category: str) -> Dict[str, Any]:
+        return {
+            "optimizer": await state.optimizer.get(),
+            **state.schedulers_params.get(category, {}),
         }
 
 
@@ -136,6 +156,7 @@ class BasicModule(Module[State], ABC):
     def parameters(cls) -> Set[Parameter]:
         return {
             OptimizerParameter(),
+            SchedulerParameter(),
             GeneratorParameter(),
             CodecParameter(),
             BatchSizeParameter(),
@@ -240,6 +261,8 @@ class BasicModule(Module[State], ABC):
     async def step(self) -> None:
         async with self.state.write_lock() as state:
             await state.optimizer.step()
+            if state.scheduler is not None:
+                await state.scheduler.step()
             await self._report_mean_from_epoch(
                 state.metrics.supervised_loss_metric,
                 state.epoch,
