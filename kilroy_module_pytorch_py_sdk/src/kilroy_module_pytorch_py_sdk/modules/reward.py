@@ -63,7 +63,7 @@ class SupervisedLossMetric(Metric[Dict]):
         return {
             "type": "line",
             "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "epoch", "yAxisKey": "loss"}},
+            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "loss"}},
         }
 
 
@@ -81,7 +81,7 @@ class ReinforcedScoreMetric(Metric[Dict]):
         return {
             "type": "line",
             "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "epoch", "yAxisKey": "score"}},
+            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "score"}},
         }
 
 
@@ -99,7 +99,7 @@ class RewardModelLossMetric(Metric[Dict]):
         return {
             "type": "line",
             "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "epoch", "yAxisKey": "loss"}},
+            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "loss"}},
         }
 
 
@@ -117,7 +117,7 @@ class RewardModelScoreMetric(Metric[Dict]):
         return {
             "type": "line",
             "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "epoch", "yAxisKey": "score"}},
+            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "score"}},
         }
 
 
@@ -151,10 +151,10 @@ class MetricsState:
 
 @dataclass
 class ReportsState:
-    epoch_supervised_losses: List[float]
-    epoch_reinforced_scores: List[float]
-    epoch_reward_model_losses: List[float]
-    epoch_reward_model_scores: List[float]
+    step_supervised_losses: List[float]
+    step_reinforced_scores: List[float]
+    step_reward_model_losses: List[float]
+    step_reward_model_scores: List[float]
 
 
 @dataclass
@@ -167,7 +167,7 @@ class State:
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
     batch_size: int
     sample_size: int
-    epoch: int
+    step: int
     metrics: MetricsState
     reports: ReportsState
     coroutine_queue: Queue[Coroutine]
@@ -357,14 +357,14 @@ class RewardModelModule(Module[State], ABC):
                         state.language_model.model,
                         sequences,
                     )
-                    state.reports.epoch_supervised_losses.append(loss)
+                    state.reports.step_supervised_losses.append(loss)
                     loss = await background(
                         self._fit_reward_model_batch,
                         state.reward_model.model,
                         sequences,
                         scores,
                     )
-                    state.reports.epoch_reward_model_losses.append(loss)
+                    state.reports.step_reward_model_losses.append(loss)
 
     async def fit_posts(
         self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
@@ -409,7 +409,7 @@ class RewardModelModule(Module[State], ABC):
                     sequences,
                     logprobs,
                 )
-                state.reports.epoch_reward_model_scores.append(score)
+                state.reports.step_reward_model_scores.append(score)
 
     async def _fit_reinforced(
         self,
@@ -429,8 +429,8 @@ class RewardModelModule(Module[State], ABC):
                         sequences,
                         scores,
                     )
-                    state.reports.epoch_reward_model_losses.append(loss)
-                    state.reports.epoch_reinforced_scores.append(
+                    state.reports.step_reward_model_losses.append(loss)
+                    state.reports.step_reinforced_scores.append(
                         scores.mean().item()
                     )
 
@@ -448,19 +448,19 @@ class RewardModelModule(Module[State], ABC):
         await self._fit_reinforced(get_results())
 
     @staticmethod
-    async def _report_mean_from_epoch(
-        metric: Metric, epoch: int, label: str, values: Iterable[float]
+    async def _report_mean_from_step(
+        metric: Metric, step: int, label: str, values: Iterable[float]
     ) -> None:
         values = list(values)
         if values:
-            await metric.report({"epoch": epoch, label: np.mean(values)})
+            await metric.report({"step": step, label: np.mean(values)})
 
     @staticmethod
     async def _reset_reports(state: State) -> None:
-        state.reports.epoch_supervised_losses = []
-        state.reports.epoch_reinforced_scores = []
-        state.reports.epoch_reward_model_losses = []
-        state.reports.epoch_reward_model_scores = []
+        state.reports.step_supervised_losses = []
+        state.reports.step_reinforced_scores = []
+        state.reports.step_reward_model_losses = []
+        state.reports.step_reward_model_scores = []
 
     async def step(self) -> None:
         async with self.state.write_lock() as state:
@@ -470,29 +470,29 @@ class RewardModelModule(Module[State], ABC):
             await state.reward_model.optimizer.step()
             if state.reward_model.scheduler is not None:
                 await state.reward_model.scheduler.step()
-            await self._report_mean_from_epoch(
+            await self._report_mean_from_step(
                 state.metrics.supervised_loss_metric,
-                state.epoch,
+                state.step,
                 "loss",
-                state.reports.epoch_supervised_losses,
+                state.reports.step_supervised_losses,
             )
-            await self._report_mean_from_epoch(
+            await self._report_mean_from_step(
                 state.metrics.reinforced_score_metric,
-                state.epoch,
+                state.step,
                 "score",
-                state.reports.epoch_reinforced_scores,
+                state.reports.step_reinforced_scores,
             )
-            await self._report_mean_from_epoch(
+            await self._report_mean_from_step(
                 state.metrics.reward_model_loss_metric,
-                state.epoch,
+                state.step,
                 "loss",
-                state.reports.epoch_reward_model_losses,
+                state.reports.step_reward_model_losses,
             )
-            await self._report_mean_from_epoch(
+            await self._report_mean_from_step(
                 state.metrics.reward_model_score_metric,
-                state.epoch,
+                state.step,
                 "score",
-                state.reports.epoch_reward_model_scores,
+                state.reports.step_reward_model_scores,
             )
             await self._reset_reports(state)
-            state.epoch += 1
+            state.step += 1

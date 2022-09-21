@@ -58,7 +58,7 @@ class SupervisedLossMetric(Metric[Dict]):
         return {
             "type": "line",
             "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "epoch", "yAxisKey": "loss"}},
+            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "loss"}},
         }
 
 
@@ -76,7 +76,7 @@ class ReinforcedScoreMetric(Metric[Dict]):
         return {
             "type": "line",
             "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "epoch", "yAxisKey": "score"}},
+            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "score"}},
         }
 
 
@@ -88,8 +88,8 @@ class MetricsState:
 
 @dataclass
 class ReportsState:
-    epoch_supervised_losses: List[float]
-    epoch_reinforced_scores: List[float]
+    step_supervised_losses: List[float]
+    step_reinforced_scores: List[float]
 
 
 @dataclass
@@ -104,7 +104,7 @@ class State:
     codec: Codec
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
     batch_size: int
-    epoch: int
+    step: int
     metrics: MetricsState
     reports: ReportsState
 
@@ -205,7 +205,7 @@ class BasicModule(Module[State], ABC):
             async for batch in streamer:
                 async with self.state.write_lock() as state:
                     loss = await background(fit, state.model, batch)
-                    state.reports.epoch_supervised_losses.append(loss)
+                    state.reports.step_supervised_losses.append(loss)
 
     async def fit_posts(
         self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
@@ -233,7 +233,7 @@ class BasicModule(Module[State], ABC):
 
         async with self.state.write_lock() as state:
             score = await background(fit)
-            state.reports.epoch_reinforced_scores.append(score)
+            state.reports.step_reinforced_scores.append(score)
 
     async def fit_scores(self, scores: List[Tuple[UUID, float]]) -> None:
         async def get_results():
@@ -246,34 +246,34 @@ class BasicModule(Module[State], ABC):
         await self._fit_reinforced(get_results())
 
     @staticmethod
-    async def _report_mean_from_epoch(
-        metric: Metric, epoch: int, label: str, values: Iterable[float]
+    async def _report_mean_from_step(
+        metric: Metric, step: int, label: str, values: Iterable[float]
     ) -> None:
         values = list(values)
         if values:
-            await metric.report({"epoch": epoch, label: np.mean(values)})
+            await metric.report({"step": step, label: np.mean(values)})
 
     @staticmethod
     async def _reset_reports(state: State) -> None:
-        state.reports.epoch_supervised_losses = []
-        state.reports.epoch_reinforced_scores = []
+        state.reports.step_supervised_losses = []
+        state.reports.step_reinforced_scores = []
 
     async def step(self) -> None:
         async with self.state.write_lock() as state:
             await state.optimizer.step()
             if state.scheduler is not None:
                 await state.scheduler.step()
-            await self._report_mean_from_epoch(
+            await self._report_mean_from_step(
                 state.metrics.supervised_loss_metric,
-                state.epoch,
+                state.step,
                 "loss",
-                state.reports.epoch_supervised_losses,
+                state.reports.step_supervised_losses,
             )
-            await self._report_mean_from_epoch(
+            await self._report_mean_from_step(
                 state.metrics.reinforced_score_metric,
-                state.epoch,
+                state.step,
                 "score",
-                state.reports.epoch_reinforced_scores,
+                state.reports.step_reinforced_scores,
             )
             await self._reset_reports(state)
-            state.epoch += 1
+            state.step += 1
