@@ -103,6 +103,7 @@ class State:
     generator: Generator
     codec: Codec
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
+    used_results: Set[UUID]
     batch_size: int
     step: int
     metrics: MetricsState
@@ -240,7 +241,8 @@ class BasicModule(Module[State], ABC):
             for post_id, score in scores:
                 # noinspection PyShadowingNames
                 async with self.state.write_lock() as state:
-                    sequence, logprob = state.results_cache.pop(post_id)
+                    sequence, logprob = state.results_cache.get(post_id)
+                    state.used_results.add(post_id)
                 yield sequence, logprob, torch.tensor(score)
 
         await self._fit_reinforced(get_results())
@@ -257,6 +259,12 @@ class BasicModule(Module[State], ABC):
     async def _reset_reports(state: State) -> None:
         state.reports.step_supervised_losses = []
         state.reports.step_reinforced_scores = []
+
+    @staticmethod
+    async def _delete_used_results(state: State) -> None:
+        for post_id in state.used_results:
+            state.results_cache.pop(post_id, None)
+        state.used_results.clear()
 
     async def step(self) -> None:
         async with self.state.write_lock() as state:
@@ -276,4 +284,5 @@ class BasicModule(Module[State], ABC):
                 state.reports.step_reinforced_scores,
             )
             await self._reset_reports(state)
+            await self._delete_used_results(state)
             state.step += 1
