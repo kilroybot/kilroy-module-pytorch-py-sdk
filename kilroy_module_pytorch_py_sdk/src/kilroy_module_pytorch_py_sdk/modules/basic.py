@@ -1,3 +1,5 @@
+import json
+import logging
 from abc import ABC
 from dataclasses import dataclass
 from typing import (
@@ -42,6 +44,8 @@ from kilroy_module_pytorch_py_sdk.utils import (
     truncate_last_element,
     unpack_to_list,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SupervisedLossMetric(Metric[Dict]):
@@ -103,7 +107,6 @@ class State:
     generator: Generator
     codec: Codec
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
-    used_results: Set[UUID]
     batch_size: int
     step: int
     metrics: MetricsState
@@ -181,12 +184,19 @@ class BasicModule(Module[State], ABC):
         async for result in generated:
             sequences = unpack_to_list(result.sequences)
             for sequence, logprob in zip(sequences, result.logprobs):
+
                 post_id = uuid4()
+
                 async with self.state.read_lock() as state:
-                    post = await state.codec.encode(state.tokenizer, sequence)
+                    codec = state.codec
+                    tokenizer = state.tokenizer
+
+                post = await codec.encode(tokenizer, sequence)
+
                 if not dry:
                     async with self.state.write_lock() as state:
                         state.results_cache[post_id] = (sequence, logprob[0])
+
                 yield post_id, post
 
     async def _fit_supervised(self, data: AsyncIterable[Tensor]) -> None:
@@ -204,18 +214,27 @@ class BasicModule(Module[State], ABC):
 
         async with batches.stream() as streamer:
             async for batch in streamer:
-                async with self.state.write_lock() as state:
-                    loss = await background(fit, state.model, batch)
-                    state.reports.step_supervised_losses.append(loss)
+                if batch:
+                    async with self.state.write_lock() as state:
+                        loss = await background(fit, state.model, batch)
+                        state.reports.step_supervised_losses.append(loss)
 
     async def fit_posts(
         self, posts: AsyncIterable[Tuple[Dict[str, Any], float]]
     ) -> None:
         async def decoded():
             async for post, _ in posts:
-                # noinspection PyShadowingNames
                 async with self.state.read_lock() as state:
-                    yield await state.codec.decode(state.tokenizer, post)
+                    codec = state.codec
+                    tokenizer = state.tokenizer
+                try:
+                    yield await codec.decode(tokenizer, post)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to decode post: {json.dumps(post)}. Skipping...",
+                        exc_info=e,
+                    )
+                    continue
 
         await self._fit_supervised(decoded())
 
@@ -223,7 +242,10 @@ class BasicModule(Module[State], ABC):
         self,
         results: AsyncIterable[Tuple[Tensor, Tensor, Tensor]],
     ) -> None:
-        results = list([result async for result in results])
+        results = [result async for result in results]
+        if not results:
+            return
+
         logprobs = torch.stack([logprob for _, logprob, _ in results])
         scores = torch.stack([score for _, _, score in results])
 
@@ -239,10 +261,13 @@ class BasicModule(Module[State], ABC):
     async def fit_scores(self, scores: List[Tuple[UUID, float]]) -> None:
         async def get_results():
             for post_id, score in scores:
-                # noinspection PyShadowingNames
                 async with self.state.write_lock() as state:
+                    if post_id not in state.results_cache:
+                        logger.warning(
+                            f"Post {str(post_id)} has not been generated. Skipping..."
+                        )
+                        continue
                     sequence, logprob = state.results_cache.get(post_id)
-                    state.used_results.add(post_id)
                 yield sequence, logprob, torch.tensor(score)
 
         await self._fit_reinforced(get_results())
@@ -261,10 +286,8 @@ class BasicModule(Module[State], ABC):
         state.reports.step_reinforced_scores = []
 
     @staticmethod
-    async def _delete_used_results(state: State) -> None:
-        for post_id in state.used_results:
-            state.results_cache.pop(post_id, None)
-        state.used_results.clear()
+    async def _delete_results(state: State) -> None:
+        state.results_cache.clear()
 
     async def step(self) -> None:
         async with self.state.write_lock() as state:
@@ -284,5 +307,5 @@ class BasicModule(Module[State], ABC):
                 state.reports.step_reinforced_scores,
             )
             await self._reset_reports(state)
-            await self._delete_used_results(state)
+            await self._delete_results(state)
             state.step += 1
