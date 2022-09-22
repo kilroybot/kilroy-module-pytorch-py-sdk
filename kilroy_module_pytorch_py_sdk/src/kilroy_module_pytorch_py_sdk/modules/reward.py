@@ -1,3 +1,5 @@
+import json
+import logging
 from abc import ABC
 from asyncio import Queue, Task
 from dataclasses import dataclass
@@ -47,6 +49,8 @@ from kilroy_module_pytorch_py_sdk.utils import (
     truncate_last_element,
     unpack_to_list,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SupervisedLossMetric(Metric[Dict]):
@@ -165,7 +169,6 @@ class State:
     backend_generator: Generator
     codec: Codec
     results_cache: Dict[UUID, Tuple[Tensor, Tensor]]
-    used_results: Set[UUID]
     batch_size: int
     sample_size: int
     step: int
@@ -290,14 +293,19 @@ class RewardModelModule(Module[State], ABC):
         async for result in generated:
             sequences = unpack_to_list(result.sequences)
             for sequence, logprob in zip(sequences, result.logprobs):
+
                 post_id = uuid4()
+
                 async with self.state.read_lock() as state:
-                    post = await state.codec.encode(
-                        state.language_model.tokenizer, sequence
-                    )
+                    codec = state.codec
+                    tokenizer = state.language_model.tokenizer
+
+                post = await codec.encode(tokenizer, sequence)
+
                 if not dry:
                     async with self.state.write_lock() as state:
                         state.results_cache[post_id] = (sequence, logprob[0])
+
                 yield post_id, post
 
     @staticmethod
@@ -350,6 +358,8 @@ class RewardModelModule(Module[State], ABC):
 
         async with batches.stream() as streamer:
             async for batch in streamer:
+                if not batch:
+                    continue
                 async with self.state.write_lock() as state:
                     sequences = pack_list(sequence for sequence, _ in batch)
                     scores = torch.vstack([score for _, score in batch])
@@ -372,13 +382,19 @@ class RewardModelModule(Module[State], ABC):
     ) -> None:
         async def decoded():
             async for post, score in posts:
-                # noinspection PyShadowingNames
                 async with self.state.read_lock() as state:
-                    post = await state.codec.decode(
-                        state.language_model.tokenizer, post
+                    codec = state.codec
+                    tokenizer = state.language_model.tokenizer
+                try:
+                    post = await codec.decode(tokenizer, post)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to decode post: {json.dumps(post)}. Skipping...",
+                        exc_info=e,
                     )
-                    score = torch.tensor(score, dtype=torch.float)
-                    yield post, score
+                    continue
+                score = torch.tensor(score, dtype=torch.float)
+                yield post, score
 
         await self._fit_supervised(decoded())
 
@@ -421,6 +437,8 @@ class RewardModelModule(Module[State], ABC):
 
         async with batches.stream() as streamer:
             async for batch in streamer:
+                if not batch:
+                    continue
                 sequences = pack_list([sequence for sequence, _, _ in batch])
                 scores = torch.vstack([score for _, _, score in batch])
                 async with self.state.write_lock() as state:
@@ -441,10 +459,13 @@ class RewardModelModule(Module[State], ABC):
     async def fit_scores(self, scores: List[Tuple[UUID, float]]) -> None:
         async def get_results():
             for post_id, score in scores:
-                # noinspection PyShadowingNames
                 async with self.state.write_lock() as state:
+                    if post_id not in state.results_cache:
+                        logger.warning(
+                            f"Post {str(post_id)} has not been generated. Skipping..."
+                        )
+                        continue
                     sequence, logprob = state.results_cache.get(post_id)
-                    state.used_results.add(post_id)
                 yield sequence, logprob, torch.tensor(score)
 
         await self._fit_reinforced(get_results())
@@ -465,10 +486,8 @@ class RewardModelModule(Module[State], ABC):
         state.reports.step_reward_model_scores = []
 
     @staticmethod
-    async def _delete_used_results(state: State) -> None:
-        for post_id in state.used_results:
-            state.results_cache.pop(post_id, None)
-        state.used_results.clear()
+    async def _delete_results(state: State) -> None:
+        state.results_cache.clear()
 
     async def step(self) -> None:
         async with self.state.write_lock() as state:
@@ -503,5 +522,5 @@ class RewardModelModule(Module[State], ABC):
                 state.reports.step_reward_model_scores,
             )
             await self._reset_reports(state)
-            await self._delete_used_results(state)
+            await self._delete_results(state)
             state.step += 1
