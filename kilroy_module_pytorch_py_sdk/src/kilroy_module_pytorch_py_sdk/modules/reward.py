@@ -66,8 +66,14 @@ class SupervisedLossMetric(Metric[Dict]):
     def config(cls) -> Dict[str, Any]:
         return {
             "type": "line",
-            "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "loss"}},
+            "data": {"datasets": [{"label": "Supervised Loss", "data": []}]},
+            "options": {
+                "parsing": {"xAxisKey": "step", "yAxisKey": "loss"},
+                "scales": {
+                    "x": {"title": {"text": "Step"}},
+                    "y": {"title": {"text": "Loss"}},
+                },
+            },
         }
 
 
@@ -84,8 +90,14 @@ class ReinforcedScoreMetric(Metric[Dict]):
     def config(cls) -> Dict[str, Any]:
         return {
             "type": "line",
-            "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "score"}},
+            "data": {"datasets": [{"label": "Reinforced Score", "data": []}]},
+            "options": {
+                "parsing": {"xAxisKey": "step", "yAxisKey": "score"},
+                "scales": {
+                    "x": {"title": {"text": "Step"}},
+                    "y": {"title": {"text": "Score"}},
+                },
+            },
         }
 
 
@@ -102,8 +114,14 @@ class RewardModelLossMetric(Metric[Dict]):
     def config(cls) -> Dict[str, Any]:
         return {
             "type": "line",
-            "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "loss"}},
+            "data": {"datasets": [{"label": "Reward Model Loss", "data": []}]},
+            "options": {
+                "parsing": {"xAxisKey": "step", "yAxisKey": "loss"},
+                "scales": {
+                    "x": {"title": {"text": "Step"}},
+                    "y": {"title": {"text": "Loss"}},
+                },
+            },
         }
 
 
@@ -120,8 +138,16 @@ class RewardModelScoreMetric(Metric[Dict]):
     def config(cls) -> Dict[str, Any]:
         return {
             "type": "line",
-            "data": {"datasets": [{"data": []}]},
-            "options": {"parsing": {"xAxisKey": "step", "yAxisKey": "score"}},
+            "data": {
+                "datasets": [{"label": "Reward Model Score", "data": []}]
+            },
+            "options": {
+                "parsing": {"xAxisKey": "step", "yAxisKey": "score"},
+                "scales": {
+                    "x": {"title": {"text": "Step"}},
+                    "y": {"title": {"text": "Score"}},
+                },
+            },
         }
 
 
