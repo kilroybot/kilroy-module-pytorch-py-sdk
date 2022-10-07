@@ -148,7 +148,7 @@ class CodecParameter(NestedParameter[State, Codec]):
 class BatchSizeParameter(Parameter[State, int]):
     @classproperty
     def schema(cls) -> Dict[str, Any]:
-        return {"type": "integer", "minimum": 1}
+        return {"type": "integer", "minimum": 1, "title": cls.pretty_name}
 
 
 class BasicModule(Module[State], ABC):

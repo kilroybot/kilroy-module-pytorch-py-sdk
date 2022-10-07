@@ -25,7 +25,16 @@ class WarmRestartsScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 1,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Number of Iterations for First Restart"
 
     class TMultParameter(SchedulerParameter[State, float]):
         def attribute_name(cls) -> str:
@@ -33,12 +42,30 @@ class WarmRestartsScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Multiplier for Number of Iterations Between Restarts"
 
     class EtaMinParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Minimum Learning Rate"
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer

@@ -38,7 +38,13 @@ class EpsilonProportionalSampler(Sampler, Configurable[EpsilonState]):
     class EpsilonParameter(Parameter[EpsilonState, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0, "maximum": 1}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "title": cls.pretty_name,
+                "default": 0.01,
+            }
 
     async def sample(self, logprobs: Tensor, n: int = 1) -> SampleResult:
         async with self.state.read_lock() as state:

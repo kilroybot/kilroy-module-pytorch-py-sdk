@@ -20,12 +20,22 @@ class StepScheduler(StandardSchedulerBase):
     class StepSizeParameter(SchedulerParameter[State, int]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 1,
+            }
 
     class GammaParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.1,
+            }
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer
