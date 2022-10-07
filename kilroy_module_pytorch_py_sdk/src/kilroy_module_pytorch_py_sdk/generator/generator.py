@@ -122,6 +122,7 @@ class Generator(Configurable[State]):
                 Sampler,
                 category=state_dict["sampler_type"],
                 default=partial(self._build_sampler, params),
+                **params.samplers_params.get(params.sampler_type, {}),
             ),
             samplers_params=state_dict["samplers_params"],
             contexts=state_dict["contexts"],
