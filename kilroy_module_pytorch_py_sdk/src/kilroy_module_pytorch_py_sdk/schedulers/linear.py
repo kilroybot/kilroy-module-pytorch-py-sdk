@@ -21,17 +21,36 @@ class LinearScheduler(StandardSchedulerBase):
     class StartFactorParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1 / 3,
+            }
 
     class EndFactorParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1.0,
+            }
 
     class TotalItersParameter(SchedulerParameter[State, int]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 5,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Total Iterations"
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer

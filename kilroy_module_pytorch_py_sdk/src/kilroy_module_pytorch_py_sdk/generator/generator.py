@@ -5,13 +5,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any, AsyncIterable, Dict, Iterable, List, Set
 
-from kilroy_module_pytorch_py_sdk.generator.utils import (
-    GenerationResult,
-    generate,
-)
-from kilroy_module_pytorch_py_sdk.models import LanguageModel
-from kilroy_module_pytorch_py_sdk.samplers import Sampler
-from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
 from kilroy_module_server_py_sdk import (
     CategorizableBasedParameter,
     Configurable,
@@ -20,6 +13,14 @@ from kilroy_module_server_py_sdk import (
     SerializableModel,
     classproperty,
 )
+
+from kilroy_module_pytorch_py_sdk.generator.utils import (
+    GenerationResult,
+    generate,
+)
+from kilroy_module_pytorch_py_sdk.models import LanguageModel
+from kilroy_module_pytorch_py_sdk.samplers import Sampler
+from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
 
 
 class Params(SerializableModel):
@@ -46,19 +47,29 @@ class SamplerParameter(CategorizableBasedParameter[State, Sampler]):
 class ContextsParameter(Parameter[State, List[str]]):
     @classproperty
     def schema(cls) -> Dict[str, Any]:
-        return {"type": "array", "items": {"type": "string"}, "minItems": 1}
+        return {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1,
+            "title": cls.pretty_name,
+            "default": [" "],
+        }
 
 
 class MaxLengthParameter(Parameter[State, int]):
     @classproperty
     def schema(cls) -> Dict[str, Any]:
-        return {"type": "integer", "minimum": 1}
+        return {"type": "integer", "minimum": 1, "title": cls.pretty_name}
+
+    @classproperty
+    def pretty_name(cls) -> str:
+        return "Maximum Length"
 
 
 class BatchSizeParameter(Parameter[State, int]):
     @classproperty
     def schema(cls) -> Dict[str, Any]:
-        return {"type": "integer", "minimum": 1}
+        return {"type": "integer", "minimum": 1, "title": cls.pretty_name}
 
 
 class Generator(Configurable[State]):

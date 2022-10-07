@@ -51,7 +51,13 @@ class NucleusSampler(Sampler, Configurable[State]):
     class PParameter(Parameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0, "maximum": 1}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "title": cls.pretty_name,
+                "default": 0.95,
+            }
 
     async def sample(self, logprobs: Tensor, n: int = 1) -> SampleResult:
         async with self.state.read_lock() as state:
@@ -70,12 +76,24 @@ class EpsilonNucleusSampler(Sampler, Configurable[EpsilonState]):
     class PParameter(Parameter[EpsilonState, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0, "maximum": 1}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "title": cls.pretty_name,
+                "default": 0.95,
+            }
 
     class EpsilonParameter(Parameter[EpsilonState, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0, "maximum": 1}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "title": cls.pretty_name,
+                "default": 0.01,
+            }
 
     async def sample(self, logprobs: Tensor, n: int = 1) -> SampleResult:
         async with self.state.read_lock() as state:

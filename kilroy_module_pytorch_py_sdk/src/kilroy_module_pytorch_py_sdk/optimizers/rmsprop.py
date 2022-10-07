@@ -23,27 +23,60 @@ class RMSPropOptimizer(StandardOptimizer):
     class LrParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.001,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Learning Rate"
 
     class MomentumParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0,
+            }
 
     class AlphaParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.99,
+            }
 
     class EpsParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1e-8,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Epsilon"
 
     class WeightDecayParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0,
+            }
 
     async def _build_default_optimizer(
         self, parameters: Iterable[Tensor]

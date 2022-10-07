@@ -24,7 +24,16 @@ class Codec(Configurable[State]):
     class MaxCharactersParameter(Parameter[State, Optional[int]]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": ["integer", "null"], "minimum": 0}
+            return {
+                "type": ["integer", "null"],
+                "minimum": 0,
+                "default": None,
+                "title": cls.pretty_name,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Maximum Characters"
 
     async def encode(
         self, tokenizer: Tokenizer, sequence: Tensor

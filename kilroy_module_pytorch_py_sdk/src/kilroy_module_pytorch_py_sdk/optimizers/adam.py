@@ -22,7 +22,16 @@ class AdamOptimizer(StandardOptimizer):
     class LrParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.001,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Learning Rate"
 
     class Beta1Parameter(OptimizerParameter[State, float]):
         def _get_param(self, group: Dict[str, Any]) -> float:
@@ -33,7 +42,16 @@ class AdamOptimizer(StandardOptimizer):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.9,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Beta 1"
 
     class Beta2Parameter(OptimizerParameter[State, float]):
         def _get_param(self, group: Dict[str, Any]) -> float:
@@ -44,17 +62,40 @@ class AdamOptimizer(StandardOptimizer):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.999,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Beta 2"
 
     class EpsParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1e-8,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Epsilon"
 
     class WeightDecayParameter(OptimizerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0,
+            }
 
     async def _build_default_optimizer(
         self, parameters: Iterable[Tensor]

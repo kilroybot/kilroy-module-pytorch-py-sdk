@@ -41,7 +41,16 @@ class OneCycleScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.1,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Maximum Learning Rate"
 
     class TotalStepsParameter(SchedulerParameter[State, int]):
         async def _set_in_scheduler(
@@ -57,7 +66,12 @@ class OneCycleScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 100,
+            }
 
     class PctStartParameter(SchedulerParameter[State, float]):
         async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
@@ -75,7 +89,17 @@ class OneCycleScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0, "maximum": 1}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "title": cls.pretty_name,
+                "default": 0.3,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Percentage of Steps for Increasing Learning Rate"
 
     class AnnealStrategyParameter(
         SchedulerParameter[State, Literal["cos", "linear"]]
@@ -97,7 +121,19 @@ class OneCycleScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "string", "enum": ["cos", "linear"]}
+            return {
+                "type": "string",
+                "oneOf": [
+                    {"const": "cos", "title": "Cosine"},
+                    {"const": "linear", "title": "Linear"},
+                ],
+                "title": cls.pretty_name,
+                "default": "cos",
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Annealing Strategy"
 
     class DivFactorParameter(SchedulerParameter[State, float]):
         async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
@@ -118,7 +154,16 @@ class OneCycleScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 25.0,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Divisor for Initial Learning Rate"
 
     class FinalDivFactorParameter(SchedulerParameter[State, float]):
         async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
@@ -133,7 +178,16 @@ class OneCycleScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1e4,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Divisor for Final Learning Rate"
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer

@@ -36,7 +36,16 @@ class CyclicScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.001,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Base Learning Rate"
 
     class MaxLRParameter(SchedulerParameter[State, float]):
         async def _get_from_scheduler(self, scheduler: CyclicLR) -> float:
@@ -49,7 +58,16 @@ class CyclicScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.006,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Maximum Learning Rate"
 
     class StepSizeUpParameter(SchedulerParameter[State, int]):
         async def _get_from_scheduler(self, scheduler: CyclicLR) -> int:
@@ -64,7 +82,12 @@ class CyclicScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 2000,
+            }
 
     class StepSizeDownParameter(SchedulerParameter[State, int]):
         async def _get_from_scheduler(self, scheduler: CyclicLR) -> int:
@@ -80,7 +103,12 @@ class CyclicScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 2000,
+            }
 
     class ModeParameter(
         SchedulerParameter[
@@ -91,13 +119,24 @@ class CyclicScheduler(StandardSchedulerBase):
         def schema(cls) -> Dict[str, Any]:
             return {
                 "type": "string",
-                "enum": ["triangular", "triangular2", "exp_range"],
+                "oneOf": [
+                    {"const": "triangular", "title": "Triangular"},
+                    {"const": "triangular2", "title": "Triangular 2"},
+                    {"const": "exp_range", "title": "Exponential Range"},
+                ],
+                "title": cls.pretty_name,
+                "default": "triangular",
             }
 
     class GammaParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1.0,
+            }
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer

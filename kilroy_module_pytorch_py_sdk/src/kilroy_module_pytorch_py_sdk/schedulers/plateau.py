@@ -26,34 +26,70 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
     class ModeParameter(SchedulerParameter[State, Literal["min", "max"]]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "string", "enum": ["min", "max"]}
+            return {
+                "type": "string",
+                "oneOf": [
+                    {"const": "min", "title": "Minimum"},
+                    {"const": "max", "title": "Maximum"},
+                ],
+                "title": cls.pretty_name,
+                "default": "min",
+            }
 
     class FactorParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.1,
+            }
 
     class PatienceParameter(SchedulerParameter[State, int]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 10,
+            }
 
     class ThresholdParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1e-4,
+            }
 
     class ThresholdModeParameter(
         SchedulerParameter[State, Literal["rel", "abs"]]
     ):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "string", "enum": ["rel", "abs"]}
+            return {
+                "type": "string",
+                "oneOf": [
+                    {"const": "rel", "title": "Relative"},
+                    {"const": "abs", "title": "Absolute"},
+                ],
+                "title": cls.pretty_name,
+                "default": "rel",
+            }
 
     class CooldownParameter(SchedulerParameter[State, int]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 0}
+            return {
+                "type": "integer",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0,
+            }
 
     class MinLrParameter(SchedulerParameter[State, float]):
         async def _get_from_scheduler(
@@ -68,12 +104,30 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
 
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Minimum Learning Rate"
 
     class EpsParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 1e-8,
+            }
+
+        @classproperty
+        def pretty_name(cls) -> str:
+            return "Epsilon"
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer

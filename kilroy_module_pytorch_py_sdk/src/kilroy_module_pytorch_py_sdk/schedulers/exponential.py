@@ -19,7 +19,12 @@ class ExponentialScheduler(StandardSchedulerBase):
     class GammaParameter(SchedulerParameter[State, float]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0}
+            return {
+                "type": "number",
+                "minimum": 0,
+                "title": cls.pretty_name,
+                "default": 0.99,
+            }
 
     async def _build_default_scheduler(
         self, optimizer: Optimizer

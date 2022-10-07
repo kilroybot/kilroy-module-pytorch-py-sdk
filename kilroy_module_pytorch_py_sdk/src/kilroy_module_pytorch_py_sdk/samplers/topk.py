@@ -49,7 +49,12 @@ class TopKSampler(Sampler, Configurable[State]):
     class KParameter(Parameter[State, int]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 10,
+            }
 
     async def sample(self, logprobs: Tensor, n: int = 1) -> SampleResult:
         async with self.state.read_lock() as state:
@@ -68,12 +73,23 @@ class EpsilonTopKSampler(Sampler, Configurable[EpsilonState]):
     class KParameter(Parameter[EpsilonState, int]):
         @classproperty
         def schema(cls) -> Dict[str, Any]:
-            return {"type": "integer", "minimum": 1}
+            return {
+                "type": "integer",
+                "minimum": 1,
+                "title": cls.pretty_name,
+                "default": 10,
+            }
 
     class EpsilonParameter(Parameter[EpsilonState, float]):
         @classproperty
-        def schema(self) -> Dict[str, Any]:
-            return {"type": "number", "minimum": 0, "maximum": 1}
+        def schema(cls) -> Dict[str, Any]:
+            return {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "title": cls.pretty_name,
+                "default": 0.01,
+            }
 
     async def sample(self, logprobs: Tensor, n: int = 1) -> SampleResult:
         async with self.state.read_lock() as state:
