@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kilroy-module-pytorch-py-sdk"
-version = "0.6.3"
+version = "0.7.0"
 description = "SDK for kilroy modules using PyTorch 🧰"
 readme = "README.md"
 authors = ["kilroy <kilroymail@pm.me>"]
