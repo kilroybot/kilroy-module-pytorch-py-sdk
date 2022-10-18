@@ -63,6 +63,10 @@ class SupervisedLossMetric(Metric[Dict]):
         return "Supervised Loss"
 
     @classproperty
+    def group(cls) -> str:
+        return "1"
+
+    @classproperty
     def config(cls) -> Dict[str, Any]:
         return {
             "type": "line",
@@ -85,6 +89,10 @@ class ReinforcedScoreMetric(Metric[Dict]):
     @classproperty
     def label(cls) -> str:
         return "Reinforced Score"
+
+    @classproperty
+    def group(cls) -> str:
+        return "1"
 
     @classproperty
     def config(cls) -> Dict[str, Any]:
@@ -111,6 +119,10 @@ class RewardModelLossMetric(Metric[Dict]):
         return "Reward Model Loss"
 
     @classproperty
+    def group(cls) -> str:
+        return "1"
+
+    @classproperty
     def config(cls) -> Dict[str, Any]:
         return {
             "type": "line",
@@ -133,6 +145,10 @@ class RewardModelScoreMetric(Metric[Dict]):
     @classproperty
     def label(cls) -> str:
         return "Reward Model Score"
+
+    @classproperty
+    def group(cls) -> str:
+        return "2"
 
     @classproperty
     def config(cls) -> Dict[str, Any]:
