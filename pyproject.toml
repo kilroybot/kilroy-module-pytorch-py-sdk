@@ -17,7 +17,7 @@ packages = [{ include = "kilroy-module-pytorch-py-sdk", from = "kilroy_module_py
 python = "^3.9"
 torch = "~1"
 numpy = "~1"
-kilroy-module-server-py-sdk = "~0.8"
+kilroy-module-server-py-sdk = "~0.9"
 
 # dev
 
