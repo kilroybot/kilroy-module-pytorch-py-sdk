@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Optional, Pattern
 
 import torch
 from kilroy_module_server_py_sdk import background
@@ -8,6 +8,7 @@ from torch.nn.utils.rnn import PackedSequence
 
 from kilroy_module_pytorch_py_sdk.models import LanguageModel
 from kilroy_module_pytorch_py_sdk.samplers.base import Sampler
+from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
 from kilroy_module_pytorch_py_sdk.utils import pack_list, unpack_to_padded
 
 
@@ -41,7 +42,7 @@ def _build_initial_state(contexts: Iterable[Iterable[int]]) -> GenerationState:
     return GenerationState(
         waiting_sequences=waiting,
         current_sequences=current,
-        current_logprobs=[torch.tensor(0) for _ in range(len(current))],
+        current_logprobs=[torch.tensor([[0]]) for _ in range(len(current))],
         current_max_length=min_length,
     )
 
@@ -77,18 +78,18 @@ def _update_state(
     state: GenerationState,
     next_values: Iterable[Tensor],
     next_logprobs: Iterable[Tensor],
-    end_value: int,
+    tokenizer: Tokenizer,
 ) -> GenerationState:
     sequences = [
         torch.cat((current, next.view(1, 1)))
         for current, next in zip(state.current_sequences, next_values)
     ]
     logprobs = [
-        torch.add(current, next)
+        torch.cat((current, next.view(1, 1)))
         for current, next in zip(state.current_logprobs, next_logprobs)
     ]
 
-    finished_mask = _get_finished_mask(next_values, end_value)
+    finished_mask = _get_finished_mask(next_values, tokenizer.end_token)
 
     state.finished_sequences.extend(
         [
@@ -121,7 +122,7 @@ def _update_state(
     for sequence in state.waiting_sequences:
         if len(sequence) == new_current_max_length:
             new_current_sequences.append(sequence)
-            new_current_logprobs.append(torch.tensor(0))
+            new_current_logprobs.append(torch.tensor([[0]]))
         else:
             new_waiting_sequences.append(sequence)
 
@@ -133,18 +134,57 @@ def _update_state(
     return state
 
 
+def _is_complete(sequence: Tensor, end_value: int) -> bool:
+    return sequence[-1].item() == end_value
+
+
+def _trim_incomplete(
+    sequence: Tensor,
+    logprobs: Tensor,
+    tokenizer: Tokenizer,
+    regex: Pattern[str],
+) -> Tuple[Tensor, Tensor]:
+    for i in range(len(sequence) - 1, -1, -1):
+        index = slice(0, i + 1)
+        sentence = tokenizer.decode(sequence[index].flatten().tolist())
+        if regex.fullmatch(sentence):
+            return sequence[index], logprobs[index]
+    return sequence, logprobs
+
+
+def _cleanup_incomplete(
+    sequence: Tensor,
+    logprobs: Tensor,
+    tokenizer: Tokenizer,
+    regex: Pattern[str],
+) -> Tuple[Tensor, Tensor]:
+    new_sequence, new_logprobs = _trim_incomplete(
+        sequence[:-1], logprobs[:-1], tokenizer, regex
+    )
+    new_sequence = torch.cat(
+        (new_sequence, torch.tensor([[tokenizer.end_token]]))
+    )
+    return new_sequence, new_logprobs
+
+
 def _complete(
-    state: GenerationState, end_value: int
+    state: GenerationState, tokenizer: Tokenizer, regex: Pattern[str]
 ) -> Tuple[List[Tensor], List[Tensor]]:
-    sequences = state.finished_sequences + state.current_sequences
-    sequences = [
-        torch.cat((sequence[:-1], torch.tensor([[end_value]])))
-        if sequence[-1].item() != end_value
-        else sequence
-        for sequence in sequences
-    ]
-    logprobs = state.finished_logprobs + state.current_logprobs
-    return sequences, logprobs
+    in_sequences = state.finished_sequences + state.current_sequences
+    in_logprobs = state.finished_logprobs + state.current_logprobs
+    out_sequences, out_logprobs = [], []
+
+    for sequence, logprobs in zip(in_sequences, in_logprobs):
+        if _is_complete(sequence, tokenizer.end_token):
+            out_sequences.append(sequence)
+            out_logprobs.append(logprobs)
+        else:
+            new_sequence, new_logprobs = _cleanup_incomplete(
+                sequence, logprobs, tokenizer, regex
+            )
+            out_sequences.append(new_sequence)
+            out_logprobs.append(new_logprobs)
+    return out_sequences, out_logprobs
 
 
 def _prepare_output(
@@ -156,7 +196,7 @@ def _prepare_output(
         reverse=True,
     )
     sequences = pack_list([sequence for sequence, _ in ordered])
-    logprobs = torch.vstack([logprob for _, logprob in ordered])
+    logprobs = torch.vstack([logprob.sum() for _, logprob in ordered])
     return GenerationResult(sequences=sequences, logprobs=logprobs)
 
 
@@ -165,12 +205,13 @@ async def generate(
     sampler: Sampler,
     contexts: Iterable[Iterable[int]],
     max_length: int,
-    end_value: int,
+    tokenizer: Tokenizer,
+    regex: Pattern[str],
 ) -> GenerationResult:
     state = _build_initial_state(contexts)
     while not _should_stop(state, max_length):
         logprobs = await background(_predict, model, state.current_sequences)
         next_values, next_logprobs = await _pick(sampler, logprobs)
-        state = _update_state(state, next_values, next_logprobs, end_value)
-    sequences, logprobs = _complete(state, end_value)
+        state = _update_state(state, next_values, next_logprobs, tokenizer)
+    sequences, logprobs = _complete(state, tokenizer, regex)
     return _prepare_output(sequences, logprobs)
