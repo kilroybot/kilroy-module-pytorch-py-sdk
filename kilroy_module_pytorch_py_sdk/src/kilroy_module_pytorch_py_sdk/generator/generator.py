@@ -1,9 +1,20 @@
 import json
 import random
+import re
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterable, Dict, Iterable, List, Set
+from typing import (
+    Any,
+    AsyncIterable,
+    Dict,
+    Iterable,
+    List,
+    Set,
+    Pattern,
+    Callable,
+    Awaitable,
+)
 
 from kilroy_module_server_py_sdk import (
     CategorizableBasedParameter,
@@ -26,9 +37,10 @@ from kilroy_module_pytorch_py_sdk.tokenizer import Tokenizer
 class Params(SerializableModel):
     sampler_type: str = "epsilonNucleus"
     samplers_params: Dict[str, Dict[str, Any]] = {}
-    contexts: List[str] = [""]
-    max_length: int
-    batch_size: int
+    contexts: List[str] = []
+    regex: str = r"^(^(?!.*\s+[a-zA-Z0-9_']*$).+$)|(^(?!.*[\.\?!]+).+$)$"
+    max_length: int = 16
+    batch_size: int = 1
 
 
 @dataclass
@@ -36,6 +48,7 @@ class State:
     sampler: Sampler
     samplers_params: Dict[str, Dict[str, Any]]
     contexts: List[str]
+    regex: Pattern[str]
     max_length: int
     batch_size: int
 
@@ -50,10 +63,31 @@ class ContextsParameter(Parameter[State, List[str]]):
         return {
             "type": "array",
             "items": {"type": "string"},
-            "minItems": 1,
             "title": cls.pretty_name,
-            "default": [" "],
+            "default": [],
         }
+
+
+class RegexParameter(Parameter[State, str]):
+    async def _get(self, state: State) -> str:
+        return state.regex.pattern
+
+    async def _set(self, state: State, value: str) -> Callable[[], Awaitable]:
+        original_value = state.regex
+
+        async def undo():
+            state.regex = original_value
+
+        state.regex = re.compile(value)
+        return undo
+
+    @classproperty
+    def schema(cls) -> Dict[str, Any]:
+        return {"type": "string", "title": cls.pretty_name}
+
+    @classproperty
+    def pretty_name(cls) -> str:
+        return "Regex"
 
 
 class MaxLengthParameter(Parameter[State, int]):
@@ -78,6 +112,7 @@ class Generator(Configurable[State]):
         return {
             SamplerParameter(),
             ContextsParameter(),
+            RegexParameter(),
             MaxLengthParameter(),
             BatchSizeParameter(),
         }
@@ -95,6 +130,7 @@ class Generator(Configurable[State]):
             sampler=await self._build_sampler(params),
             samplers_params=params.samplers_params,
             contexts=params.contexts,
+            regex=re.compile(params.regex),
             max_length=params.max_length,
             batch_size=params.batch_size,
         )
@@ -104,6 +140,7 @@ class Generator(Configurable[State]):
             "sampler_type": state.sampler.category,
             "samplers_params": state.samplers_params,
             "contexts": state.contexts,
+            "regex": state.regex.pattern,
             "max_length": state.max_length,
             "batch_size": state.batch_size,
         }
@@ -126,6 +163,7 @@ class Generator(Configurable[State]):
             ),
             samplers_params=state_dict["samplers_params"],
             contexts=state_dict["contexts"],
+            regex=re.compile(state_dict["regex"]),
             max_length=state_dict["max_length"],
             batch_size=state_dict["batch_size"],
         )
@@ -139,7 +177,7 @@ class Generator(Configurable[State]):
     def _get_contexts(
         state: State, tokenizer: Tokenizer, n: int
     ) -> Iterable[List[int]]:
-        contexts = random.choices(state.contexts, k=n)
+        contexts = random.choices(state.contexts or [""], k=n)
 
         for context in contexts:
             encoded = tokenizer.encode(context)
@@ -162,5 +200,6 @@ class Generator(Configurable[State]):
                     state.sampler,
                     contexts,
                     state.max_length,
-                    tokenizer.end_token,
+                    tokenizer,
+                    state.regex,
                 )
