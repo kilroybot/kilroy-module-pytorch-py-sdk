@@ -14,9 +14,9 @@ SDK for kilroy modules using PyTorch 🧰
 
 This `README` provides info about the development process.
 
-For more info about the package itself
-see `kilroy_module_pytorch_py_sdk/README.md`
-or [docs](https://kilroybot.github.io/kilroy-module-pytorch-py-sdk).
+For more info about the package itself see
+[package `README`](kilroy_module_pytorch_py_sdk/README.md) or
+[docs](https://kilroybot.github.io/kilroy-module-pytorch-py-sdk).
 
 ## Quickstart (on Ubuntu)
 
