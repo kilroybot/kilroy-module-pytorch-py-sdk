@@ -18,6 +18,7 @@ class Params(SerializableModel):
 
 class StepScheduler(StandardSchedulerBase):
     class StepSizeParameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -28,6 +29,7 @@ class StepScheduler(StandardSchedulerBase):
             }
 
     class GammaParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {

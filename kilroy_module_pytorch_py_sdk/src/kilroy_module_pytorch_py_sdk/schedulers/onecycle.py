@@ -22,11 +22,13 @@ class Params(SerializableModel):
 
 class OneCycleScheduler(StandardSchedulerBase):
     class MaxLRParameter(SchedulerParameter[State, float]):
-        async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
+        @classmethod
+        async def _get_from_scheduler(cls, scheduler: OneCycleLR) -> float:
             return scheduler.optimizer.param_groups[0]["max_lr"]
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: OneCycleLR, value: float
+            cls, scheduler: OneCycleLR, value: float
         ) -> None:
             for group in scheduler.optimizer.param_groups:
                 old_initial_lr = group["initial_lr"]
@@ -39,6 +41,7 @@ class OneCycleScheduler(StandardSchedulerBase):
                 group["max_lr"] = value
                 group["min_lr"] = group["initial_lr"] / old_final_div_factor
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -48,15 +51,18 @@ class OneCycleScheduler(StandardSchedulerBase):
                 "default": 0.1,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Maximum Learning Rate"
 
     class TotalStepsParameter(SchedulerParameter[State, int]):
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: OneCycleLR, value: int
+            cls, scheduler: OneCycleLR, value: int
         ) -> None:
             old_total_steps = scheduler.total_steps
+            # noinspection PyUnresolvedReferences,PyProtectedMember
             phases = scheduler._schedule_phases
             pct_start = (phases[0]["end_step"] + 1) / old_total_steps
 
@@ -64,6 +70,7 @@ class OneCycleScheduler(StandardSchedulerBase):
             phases[0]["end_step"] = float(pct_start * value) - 1
             phases[1]["end_step"] = value - 1
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -74,19 +81,24 @@ class OneCycleScheduler(StandardSchedulerBase):
             }
 
     class PctStartParameter(SchedulerParameter[State, float]):
-        async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
+        @classmethod
+        async def _get_from_scheduler(cls, scheduler: OneCycleLR) -> float:
+            # noinspection PyUnresolvedReferences,PyProtectedMember
             phases = scheduler._schedule_phases
             steps = scheduler.total_steps
             return (phases[0]["end_step"] + 1) / steps
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: OneCycleLR, value: float
+            cls, scheduler: OneCycleLR, value: float
         ) -> None:
+            # noinspection PyUnresolvedReferences,PyProtectedMember
             phases = scheduler._schedule_phases
             steps = scheduler.total_steps
             phases[0]["end_step"] = float(value * steps) - 1
             phases[1]["end_step"] = steps - 1
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -97,6 +109,7 @@ class OneCycleScheduler(StandardSchedulerBase):
                 "default": 0.3,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Percentage of Steps for Increasing Learning Rate"
@@ -104,21 +117,27 @@ class OneCycleScheduler(StandardSchedulerBase):
     class AnnealStrategyParameter(
         SchedulerParameter[State, Literal["cos", "linear"]]
     ):
+        @classmethod
         async def _get_from_scheduler(
-            self, scheduler: OneCycleLR
+            cls, scheduler: OneCycleLR
         ) -> Literal["cos", "linear"]:
+            # noinspection PyProtectedMember,PyUnresolvedReferences
             if scheduler.anneal_func is scheduler._annealing_cos:
                 return "cos"
             return "linear"
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: OneCycleLR, value: Literal["cos", "linear"]
+            cls, scheduler: OneCycleLR, value: Literal["cos", "linear"]
         ) -> None:
             if value == "cos":
+                # noinspection PyProtectedMember,PyUnresolvedReferences
                 scheduler.anneal_func = scheduler._annealing_cos
             else:
+                # noinspection PyProtectedMember,PyUnresolvedReferences
                 scheduler.anneal_func = scheduler._annealing_linear
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -131,17 +150,20 @@ class OneCycleScheduler(StandardSchedulerBase):
                 "default": "cos",
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Annealing Strategy"
 
     class DivFactorParameter(SchedulerParameter[State, float]):
-        async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
+        @classmethod
+        async def _get_from_scheduler(cls, scheduler: OneCycleLR) -> float:
             group = scheduler.optimizer.param_groups[0]
             return group["max_lr"] / group["initial_lr"]
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: OneCycleLR, value: float
+            cls, scheduler: OneCycleLR, value: float
         ) -> None:
             for group in scheduler.optimizer.param_groups:
                 old_initial_lr = group["initial_lr"]
@@ -152,6 +174,7 @@ class OneCycleScheduler(StandardSchedulerBase):
                 group["initial_lr"] = old_max_lr / value
                 group["min_lr"] = old_initial_lr / old_final_div_factor
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -161,21 +184,25 @@ class OneCycleScheduler(StandardSchedulerBase):
                 "default": 25.0,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Divisor for Initial Learning Rate"
 
     class FinalDivFactorParameter(SchedulerParameter[State, float]):
-        async def _get_from_scheduler(self, scheduler: OneCycleLR) -> float:
+        @classmethod
+        async def _get_from_scheduler(cls, scheduler: OneCycleLR) -> float:
             group = scheduler.optimizer.param_groups[0]
             return group["initial_lr"] / group["min_lr"]
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: OneCycleLR, value: float
+            cls, scheduler: OneCycleLR, value: float
         ) -> None:
             for group in scheduler.optimizer.param_groups:
                 group["min_lr"] = group["initial_lr"] / value
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -185,6 +212,7 @@ class OneCycleScheduler(StandardSchedulerBase):
                 "default": 1e4,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Divisor for Final Learning Rate"

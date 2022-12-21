@@ -12,7 +12,7 @@ from kilroy_module_pytorch_py_sdk.optimizers.base import (
 
 
 class Params(SerializableModel):
-    lr: float = 0.001
+    lr: float = 0.00001
     betas: List[float] = [0.9, 0.999]
     eps: float = 1e-8
     weight_decay: float = 0
@@ -20,26 +20,31 @@ class Params(SerializableModel):
 
 class AdamOptimizer(StandardOptimizer):
     class LrParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
                 "type": "number",
                 "minimum": 0,
                 "title": cls.pretty_name,
-                "default": 0.001,
+                "default": 0.00001,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Learning Rate"
 
     class Beta1Parameter(OptimizerParameter[State, float]):
-        def _get_param(self, group: Dict[str, Any]) -> float:
+        @classmethod
+        def _get_param(cls, group: Dict[str, Any]) -> float:
             return group["betas"][0]
 
-        def _set_param(self, group: Dict[str, Any], value: float) -> None:
+        @classmethod
+        def _set_param(cls, group: Dict[str, Any], value: float) -> None:
             group["betas"][0] = value
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -49,17 +54,21 @@ class AdamOptimizer(StandardOptimizer):
                 "default": 0.9,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Beta 1"
 
     class Beta2Parameter(OptimizerParameter[State, float]):
-        def _get_param(self, group: Dict[str, Any]) -> float:
+        @classmethod
+        def _get_param(cls, group: Dict[str, Any]) -> float:
             return group["betas"][1]
 
-        def _set_param(self, group: Dict[str, Any], value: float) -> None:
+        @classmethod
+        def _set_param(cls, group: Dict[str, Any], value: float) -> None:
             group["betas"][1] = value
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -69,11 +78,13 @@ class AdamOptimizer(StandardOptimizer):
                 "default": 0.999,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Beta 2"
 
     class EpsParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -83,11 +94,13 @@ class AdamOptimizer(StandardOptimizer):
                 "default": 1e-8,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Epsilon"
 
     class WeightDecayParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {

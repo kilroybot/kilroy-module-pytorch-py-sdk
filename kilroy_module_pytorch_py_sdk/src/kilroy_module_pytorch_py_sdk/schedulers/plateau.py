@@ -24,6 +24,7 @@ class Params(SerializableModel):
 
 class ReduceOnPlateauScheduler(StandardSchedulerBase):
     class ModeParameter(SchedulerParameter[State, Literal["min", "max"]]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -37,6 +38,7 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
             }
 
     class FactorParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -47,6 +49,7 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
             }
 
     class PatienceParameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -57,6 +60,7 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
             }
 
     class ThresholdParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -69,6 +73,7 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
     class ThresholdModeParameter(
         SchedulerParameter[State, Literal["rel", "abs"]]
     ):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -82,6 +87,7 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
             }
 
     class CooldownParameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -92,16 +98,19 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
             }
 
     class MinLrParameter(SchedulerParameter[State, float]):
+        @classmethod
         async def _get_from_scheduler(
-            self, scheduler: ReduceLROnPlateau
+            cls, scheduler: ReduceLROnPlateau
         ) -> float:
             return scheduler.min_lrs[0]
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: ReduceLROnPlateau, value: float
+            cls, scheduler: ReduceLROnPlateau, value: float
         ) -> None:
             scheduler.min_lrs = [value] * len(scheduler.min_lrs)
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -111,11 +120,13 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
                 "default": 0,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Minimum Learning Rate"
 
     class EpsParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -125,6 +136,7 @@ class ReduceOnPlateauScheduler(StandardSchedulerBase):
                 "default": 1e-8,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Epsilon"

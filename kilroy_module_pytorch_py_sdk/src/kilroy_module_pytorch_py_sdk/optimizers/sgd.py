@@ -12,7 +12,7 @@ from kilroy_module_pytorch_py_sdk.optimizers.base import (
 
 
 class Params(SerializableModel):
-    lr: float = 0.001
+    lr: float = 0.00001
     momentum: float = 0
     weight_decay: float = 0
     dampening: float = 0
@@ -20,20 +20,23 @@ class Params(SerializableModel):
 
 class SGDOptimizer(StandardOptimizer):
     class LrParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
                 "type": "number",
                 "minimum": 0,
                 "title": cls.pretty_name,
-                "default": 0.001,
+                "default": 0.00001,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Learning Rate"
 
     class MomentumParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -44,6 +47,7 @@ class SGDOptimizer(StandardOptimizer):
             }
 
     class WeightDecayParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -54,6 +58,7 @@ class SGDOptimizer(StandardOptimizer):
             }
 
     class DampeningParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {

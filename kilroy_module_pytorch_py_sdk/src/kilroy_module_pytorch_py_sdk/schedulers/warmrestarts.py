@@ -20,9 +20,12 @@ class Params(SerializableModel):
 
 class WarmRestartsScheduler(StandardSchedulerBase):
     class T0Parameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
+        @classproperty
         def attribute_name(cls) -> str:
             return "T_0"
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -32,14 +35,18 @@ class WarmRestartsScheduler(StandardSchedulerBase):
                 "default": 1,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Number of Iterations for First Restart"
 
     class TMultParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
+        @classproperty
         def attribute_name(cls) -> str:
             return "T_mult"
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -49,11 +56,13 @@ class WarmRestartsScheduler(StandardSchedulerBase):
                 "default": 1,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Multiplier for Number of Iterations Between Restarts"
 
     class EtaMinParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -63,6 +72,7 @@ class WarmRestartsScheduler(StandardSchedulerBase):
                 "default": 0,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Minimum Learning Rate"

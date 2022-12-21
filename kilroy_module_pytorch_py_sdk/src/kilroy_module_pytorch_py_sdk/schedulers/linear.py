@@ -19,6 +19,7 @@ class Params(SerializableModel):
 
 class LinearScheduler(StandardSchedulerBase):
     class StartFactorParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -29,6 +30,7 @@ class LinearScheduler(StandardSchedulerBase):
             }
 
     class EndFactorParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -39,6 +41,7 @@ class LinearScheduler(StandardSchedulerBase):
             }
 
     class TotalItersParameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -48,6 +51,7 @@ class LinearScheduler(StandardSchedulerBase):
                 "default": 5,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Total Iterations"

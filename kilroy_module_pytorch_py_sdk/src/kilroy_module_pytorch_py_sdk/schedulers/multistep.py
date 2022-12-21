@@ -19,16 +19,19 @@ class Params(SerializableModel):
 
 class MultiStepScheduler(StandardSchedulerBase):
     class MilestonesParameter(SchedulerParameter[State, List[int]]):
+        @classmethod
         async def _get_from_scheduler(
-            self, scheduler: MultiStepLR
+            cls, scheduler: MultiStepLR
         ) -> List[int]:
             return list(sorted(scheduler.milestones.elements()))
 
+        @classmethod
         async def _set_in_scheduler(
-            self, scheduler: MultiStepLR, value: List[int]
+            cls, scheduler: MultiStepLR, value: List[int]
         ) -> None:
             scheduler.milestones = Counter(value)
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -39,6 +42,7 @@ class MultiStepScheduler(StandardSchedulerBase):
             }
 
     class GammaParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {

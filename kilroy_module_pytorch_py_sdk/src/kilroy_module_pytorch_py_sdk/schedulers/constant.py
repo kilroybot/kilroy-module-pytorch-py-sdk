@@ -18,6 +18,7 @@ class Params(SerializableModel):
 
 class ConstantScheduler(StandardSchedulerBase):
     class FactorParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -28,6 +29,7 @@ class ConstantScheduler(StandardSchedulerBase):
             }
 
     class TotalItersParameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -37,6 +39,7 @@ class ConstantScheduler(StandardSchedulerBase):
                 "default": 5,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Total Iterations"

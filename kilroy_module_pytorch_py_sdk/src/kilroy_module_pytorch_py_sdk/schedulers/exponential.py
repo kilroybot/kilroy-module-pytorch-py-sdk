@@ -17,6 +17,7 @@ class Params(SerializableModel):
 
 class ExponentialScheduler(StandardSchedulerBase):
     class GammaParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {

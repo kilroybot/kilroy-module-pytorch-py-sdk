@@ -19,9 +19,12 @@ class Params(SerializableModel):
 
 class CosineAnnealingScheduler(StandardSchedulerBase):
     class TMaxParameter(SchedulerParameter[State, int]):
+        # noinspection PyMethodParameters
+        @classproperty
         def attribute_name(cls) -> str:
             return "T_max"
 
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -31,11 +34,13 @@ class CosineAnnealingScheduler(StandardSchedulerBase):
                 "default": 1,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Maximum Iterations"
 
     class EtaMinParameter(SchedulerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -45,6 +50,7 @@ class CosineAnnealingScheduler(StandardSchedulerBase):
                 "default": 0,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Minimum Learning Rate"

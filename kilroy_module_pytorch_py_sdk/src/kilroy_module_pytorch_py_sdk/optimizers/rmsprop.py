@@ -12,7 +12,7 @@ from kilroy_module_pytorch_py_sdk.optimizers.base import (
 
 
 class Params(SerializableModel):
-    lr: float = 0.001
+    lr: float = 0.00001
     momentum: float = 0
     alpha: float = 0.99
     eps: float = 1e-8
@@ -21,20 +21,23 @@ class Params(SerializableModel):
 
 class RMSPropOptimizer(StandardOptimizer):
     class LrParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
                 "type": "number",
                 "minimum": 0,
                 "title": cls.pretty_name,
-                "default": 0.001,
+                "default": 0.00001,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Learning Rate"
 
     class MomentumParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -45,6 +48,7 @@ class RMSPropOptimizer(StandardOptimizer):
             }
 
     class AlphaParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -55,6 +59,7 @@ class RMSPropOptimizer(StandardOptimizer):
             }
 
     class EpsParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
@@ -64,11 +69,13 @@ class RMSPropOptimizer(StandardOptimizer):
                 "default": 1e-8,
             }
 
+        # noinspection PyMethodParameters
         @classproperty
         def pretty_name(cls) -> str:
             return "Epsilon"
 
     class WeightDecayParameter(OptimizerParameter[State, float]):
+        # noinspection PyMethodParameters
         @classproperty
         def schema(cls) -> Dict[str, Any]:
             return {
