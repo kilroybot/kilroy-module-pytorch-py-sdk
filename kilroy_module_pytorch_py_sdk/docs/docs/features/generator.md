@@ -6,8 +6,6 @@ This is where the generator comes in.
 
 Generator takes a language model
 and is responsible for generating complete results.
-It uses [samplers](samplers.md) to pick the actual words.
-
 It's optimized for batch processing,
 so you can generate multiple results at once.
 
