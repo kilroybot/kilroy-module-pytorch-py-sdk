@@ -359,7 +359,7 @@ class MiniBatchGradientDescentMethod(MiniBatchGradientDescentMethodBase):
                     if first.metrics.aggregated is not None:
                         await first.metrics.aggregated.report(
                             epoch - 1,
-                            torch.stack([r.values for r in reports])
+                            torch.stack([r.values.mean() for r in reports])
                             .mean()
                             .item(),
                         )
