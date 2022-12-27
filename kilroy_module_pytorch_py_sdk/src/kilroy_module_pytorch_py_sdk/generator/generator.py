@@ -3,9 +3,10 @@ import re
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Set, Type, Pattern, Tuple
+from typing import Iterable, List, Set, Type, Pattern, Tuple, Optional
 
 import torch
+from kilroy_module_server_py_sdk import Configurable, Parameter, classproperty
 from torch import Tensor
 from torch.distributions import Categorical
 
@@ -25,7 +26,6 @@ from kilroy_module_pytorch_py_sdk.utils import (
     pack_list,
     batched_forward,
 )
-from kilroy_module_server_py_sdk import Configurable, Parameter, classproperty
 
 
 @dataclass
@@ -197,57 +197,50 @@ class Generator(GeneratorBase):
         return state
 
     @staticmethod
-    def _is_complete(sequence: SequenceState, end_value: int) -> bool:
-        return (sequence.context + sequence.response)[-1] == end_value
-
-    @staticmethod
-    def _trim_incomplete(
+    def _trim_until_valid(
         sequence: SequenceState,
         tokenizer: Tokenizer,
         regex: Pattern[str],
     ) -> SequenceState:
         for i in range(len(sequence.response) - 1, -1, -1):
             index = slice(0, i + 1)
-            sentence = tokenizer.decode(sequence.response[index])
+            sentence = tokenizer.decode(
+                sequence.context + sequence.response[index]
+            )
             if regex.fullmatch(sentence):
                 return SequenceState(
                     context=sequence.context,
                     response=sequence.response[index],
                 )
-        for i in range(len(sequence.context) - 1, -1, -1):
-            index = slice(0, i + 1)
-            sentence = tokenizer.decode(sequence.context[index])
-            if regex.fullmatch(sentence):
-                return SequenceState(
-                    context=sequence.context[index], response=[]
-                )
-        return sequence
+
+        raise ValueError("No valid sentence found")
 
     def _complete(
         self,
         state: GenerationState,
         tokenizer: Tokenizer,
         regex: Pattern[str],
-    ) -> List[SequenceState]:
+    ) -> List[Optional[SequenceState]]:
         in_sequences = state.finished_sequences + state.current_sequences
         out_sequences = []
 
         for sequence in in_sequences:
-            if self._is_complete(sequence, tokenizer.end_token):
-                out_sequences.append(sequence)
-            else:
-                new_sequence = self._trim_incomplete(
-                    sequence, tokenizer, regex
-                )
-                out_sequences.append(new_sequence)
+            try:
+                sequence = self._trim_until_valid(sequence, tokenizer, regex)
+            except ValueError:
+                sequence = None
+            out_sequences.append(sequence)
         return out_sequences
 
     @staticmethod
     def _prepare_output(
-        sequences: List[SequenceState],
-    ) -> List[Tuple[List[int], List[int]]]:
+        sequences: List[Optional[SequenceState]],
+    ) -> List[Optional[Tuple[List[int], List[int]]]]:
         return [
-            (sequence.context, sequence.response) for sequence in sequences
+            (sequence.context, sequence.response)
+            if sequence is not None
+            else None
+            for sequence in sequences
         ]
 
     async def _generate(
@@ -256,7 +249,7 @@ class Generator(GeneratorBase):
         contexts: Iterable[Iterable[int]],
         max_length: int,
         regex: Pattern[str],
-    ) -> List[Tuple[List[int], List[int]]]:
+    ) -> List[Optional[Tuple[List[int], List[int]]]]:
         state = self._build_initial_generation_state(contexts)
         while not self._should_stop(state, max_length):
             logprobs = await self._predict(model, state.current_sequences)
@@ -272,14 +265,21 @@ class Generator(GeneratorBase):
         model: ModelInfo[SequentialModel],
         n: int,
     ) -> List[Tuple[List[int], List[int]]]:
-        async with self.state.read_lock() as state:
-            contexts = self._sample_contexts(
-                state.contexts, model.tokenizer, n
-            )
+        out = []
 
-            return await self._generate(
+        while len(out) < n:
+            async with self.state.read_lock() as state:
+                contexts = self._sample_contexts(
+                    state.contexts, model.tokenizer, n - len(out)
+                )
+            sequences = await self._generate(
                 model,
                 contexts,
                 state.max_length,
                 state.regex,
             )
+            out.extend(
+                sequence for sequence in sequences if sequence is not None
+            )
+
+        return out
