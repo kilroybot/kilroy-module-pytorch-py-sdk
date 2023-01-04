@@ -18,6 +18,7 @@ from uuid import uuid4
 import torch
 from aiostream.aiter_utils import AsyncIteratorContext
 from aiostream.stream import iterate
+from kilroy_server_py_utils.utils import batchify, background
 from torch import Tensor, nn
 from torch.nn.utils.rnn import (
     PackedSequence,
@@ -27,7 +28,6 @@ from torch.nn.utils.rnn import (
 )
 
 from kilroy_module_pytorch_py_sdk.models.abc import SequentialModel
-from kilroy_server_py_utils.utils import batchify, background
 
 T = TypeVar("T")
 
@@ -138,7 +138,9 @@ class CachingAsyncIterable(AsyncIterable[T], Generic[T]):
     _iterator: AsyncIterator[T]
     _cache: MutableMapping[str, T]
     _prefix: str
+    _shuffle: bool
     _watermark: int
+    _length: Optional[int]
     _lock: Lock
 
     def __init__(
@@ -146,11 +148,12 @@ class CachingAsyncIterable(AsyncIterable[T], Generic[T]):
         iterable: AsyncIterable[T],
         cache: Optional[MutableMapping[str, T]] = None,
         prefix: Optional[str] = None,
+        shuffle: bool = True,
     ):
         self._ctx = iterate(iterable).stream()
         self._cache = cache if cache is not None else {}
         self._prefix = prefix if prefix is not None else uuid4().hex
-        self._watermark = 0
+        self._shuffle = shuffle
 
     def _make_key(self, i: int) -> str:
         return f"{self._prefix}-{i}"
@@ -169,17 +172,39 @@ class CachingAsyncIterable(AsyncIterable[T], Generic[T]):
 
             return self._cache[self._make_key(self._watermark - 1)]
 
-    async def __aiter__(self) -> AsyncIterator[T]:
+    async def _iter_cached(self) -> AsyncIterator[T]:
+        indices = (
+            torch.randperm(self._length).tolist()
+            if self._shuffle
+            else range(self._length)
+        )
+
+        for i in indices:
+            yield await self._get_at(i)
+
+    async def _iter_uncached(self) -> AsyncIterator[T]:
         i = 0
         while True:
             try:
                 yield await self._get_at(i)
             except StopAsyncIteration:
+                async with self._lock:
+                    self._length = i
                 return
             i += 1
 
+    async def __aiter__(self) -> AsyncIterator[T]:
+        async with self._lock:
+            is_cached = self._length is not None
+
+        ait = self._iter_cached() if is_cached else self._iter_uncached()
+        async for x in ait:
+            yield x
+
     async def __aenter__(self) -> "CachingAsyncIterable[T]":
         self._lock = Lock()
+        self._watermark = 0
+        self._length = None
         await self._ctx.__aenter__()
         self._iterator = self._ctx.__aiter__()
         return self
@@ -194,5 +219,6 @@ class CachingAsyncIterable(AsyncIterable[T], Generic[T]):
             key = self._make_key(i)
             del self._cache[key]
         self._watermark = 0
+        self._length = None
         await self._ctx.__aexit__(exc_type, exc, traceback)
         return None
