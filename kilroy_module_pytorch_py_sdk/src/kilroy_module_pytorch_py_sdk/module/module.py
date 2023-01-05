@@ -78,6 +78,8 @@ class PytorchModuleBase(Module[State], ABC):
     @staticmethod
     async def _save_models(models: ModelsRegistry) -> None:
         await models.policy.save()
+        await models.value.save()
+        await models.baseline.save()
 
     @classmethod
     async def _save_trainer(cls, trainer: Trainer, directory: Path) -> None:
@@ -205,6 +207,7 @@ class PytorchModule(PytorchModuleBase, ABC):
         async with self.state.write_lock() as state:
             await state.models.policy.reset()
             await state.models.value.reset()
+            await state.models.baseline.reset()
         await super().reset_self()
 
     async def get_metrics(self) -> Collection[Metric]:
